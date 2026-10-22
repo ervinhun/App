@@ -1,0 +1,60 @@
+name: CI
+
+# Adapted from docs/ci-cd/flutter-ci-cd in the Final project repo. The Flutter
+# project lives in app/, not the repo root, hence the working-directory below.
+# Test running is temporarily switched off (RUN_TESTS) until the team
+# actually starts writing tests — flip it to 'true' when ready.
+#
+# gen-l10n / build_runner codegen steps are left out for now since no
+# l10n.yaml or freezed/drift sources exist yet; add them back once those are
+# set up (see docs/ci-cd/flutter-ci-cd/.github/workflows/ci.yml for the
+# pattern).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  RUN_TESTS: 'false'
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  code-quality:
+    name: Format, analyze & test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Verify dart format
+        run: dart format --set-exit-if-changed --output=none .
+
+      - name: Analyze code
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests with coverage
+        if: env.RUN_TESTS == 'true'
+        run: flutter test --coverage
+
+      - name: Upload coverage report
+        if: env.RUN_TESTS == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: flutter-coverage
+          path: app/coverage/lcov.info
+          retention-days: 14

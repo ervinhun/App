@@ -1,0 +1,65 @@
+name: CD
+
+# Draft pipeline — real build/signing steps (Android keystore, iOS
+# certificates, store upload, etc.) land once those are set up. For now this
+# only handles automatic versioning: every push to main that passes CI gets
+# a new semver tag and a GitHub release, computed from commit messages
+# (append "(MAJOR)" or "(MINOR)" to a commit message to bump those; anything
+# else bumps patch).
+#
+# Triggered off CI actually completing (workflow_run), not a second
+# independent `push:` trigger, so a release is never tagged from a commit
+# whose build/test hasn't actually finished and passed.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+
+jobs:
+  version:
+    name: Compute next version & tag
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version_tag: ${{ steps.semver.outputs.version_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Compute next semantic version
+        id: semver
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: 'v'
+          major_pattern: '(MAJOR)'
+          minor_pattern: '(MINOR)'
+          bump_each_commit: true
+
+      - name: Create and push tag
+        run: |
+          git tag "${{ steps.semver.outputs.version_tag }}"
+          git push origin "${{ steps.semver.outputs.version_tag }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.semver.outputs.version_tag }}
+          generate_release_notes: true
+
+  build-android:
+    name: Build Android (TODO)
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder — signing/build not implemented yet
+        run: |
+          echo "TODO: build & sign an Android artifact for ${{ needs.version.outputs.version_tag }} once a keystore is set up."
+          echo "See docs/ci-cd/flutter-ci-cd in the Final project repo for a reference implementation (cd-android.yml)."
