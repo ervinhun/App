@@ -77,14 +77,22 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # `secrets` can't be referenced in `if:` conditions, hence checking
+      # presence here and gating later steps on this step's output instead.
+      - name: Check for Android signing secrets
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "configured=$([ -n "$KEYSTORE_BASE64" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Decode Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: steps.signing.outputs.configured == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
 
       - name: Create key.properties
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: steps.signing.outputs.configured == 'true'
         run: |
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
@@ -103,8 +111,14 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk "dist/${{ steps.version.outputs.BASENAME }}.apk"
           cp build/app/outputs/bundle/release/app-release.aab "dist/${{ steps.version.outputs.BASENAME }}.aab"
 
+      - name: Check for Firebase App Distribution secrets
+        id: firebase
+        env:
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        run: echo "configured=$([ -n "$FIREBASE_APP_ID" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Distribute to Firebase App Distribution testers
-        if: ${{ secrets.FIREBASE_APP_ID != '' }}
+        if: steps.firebase.outputs.configured == 'true'
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
