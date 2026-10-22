@@ -1,0 +1,124 @@
+name: CD - Build & Distribute iOS
+
+# Adapted from docs/ci-cd/flutter-ci-cd/.github/workflows/cd-ios.yml.disabled
+# in the Final project repo. Kept disabled (.disabled suffix) until the
+# Apple developer account is confirmed. Rename to `cd-ios.yml` once
+# CERTIFICATE_PASSWORD, DISTRIBUTION_CERT_BASE64 and
+# PROVISIONING_PROFILE_BASE64 secrets exist.
+#
+# Same adaptations as cd-android.yml: working-directory is app/, no
+# .fvmrc yet, build_runner/gen-l10n steps left out until those are set up.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  BUILD_NUMBER_OFFSET: 0
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  build-ios:
+    name: Build iOS
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Resolve version and build number
+        id: version
+        run: |
+          version=$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d '+' -f 1)
+          build_number=$((BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER))
+          echo "VERSION=$version" >> "$GITHUB_OUTPUT"
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_OUTPUT"
+          echo "BASENAME=fridgefriend-app-$version-$build_number" >> "$GITHUB_OUTPUT"
+          echo "Building $version ($build_number)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Set Up Keychain
+        run: |
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+      - name: Import Certificate
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          echo "${{ secrets.DISTRIBUTION_CERT_BASE64 }}" | base64 -d > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+      - name: Install Provisioning Profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 -d > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      - name: Build iOS (Release)
+        run: |
+          flutter build ipa --release --obfuscate --split-debug-info=debug-info \
+            --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          ipa=$(find build/ios/ipa -name '*.ipa' -print -quit)
+          if [ -z "$ipa" ]; then
+            echo "No IPA produced under build/ios/ipa" >&2
+            exit 1
+          fi
+          cp "$ipa" "dist/${{ steps.version.outputs.BASENAME }}.ipa"
+
+      - name: Look for a release matching the pubspec version
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to Release
+        if: steps.release.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "v${{ steps.version.outputs.VERSION }}" \
+            "dist/${{ steps.version.outputs.BASENAME }}.ipa" \
+            --clobber
+          echo "Attached to release v${{ steps.version.outputs.VERSION }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload as Build Artifact
+        if: steps.release.outputs.exists == 'false'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.version.outputs.BASENAME }}-ios
+          path: app/dist/
+
+      - name: Upload Debug Symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.BASENAME }}-debug-info
+          path: app/debug-info/

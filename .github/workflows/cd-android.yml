@@ -1,0 +1,142 @@
+name: CD - Build & Distribute Android
+
+# Adapted from docs/ci-cd/flutter-ci-cd/.github/workflows/cd-android.yml in
+# the Final project repo. Differences from that template:
+#   - working-directory is app/, not the repo root (the Flutter project
+#     lives in a subfolder of this repo).
+#   - No .fvmrc yet, same as ci.yml — Flutter resolves to the latest stable
+#     release instead of a pinned version.
+#   - build_runner/gen-l10n steps are left out, same reason as ci.yml: no
+#     l10n.yaml or freezed/drift sources exist yet. Add them back once
+#     those are set up.
+#   - Signing (KEYSTORE_*) and Firebase App Distribution
+#     (FIREBASE_APP_ID / FIREBASE_SERVICE_CREDENTIALS) secrets don't exist
+#     yet, so those steps are each gated on their secret actually being
+#     set — this lets the workflow build & upload a debug-signed APK/AAB
+#     as a run artifact right now without failing, and start signing for
+#     real + distributing to testers the moment those secrets are added,
+#     with no further workflow change needed.
+#   - android/app/build.gradle.kts still signs release builds with the
+#     debug key (its own TODO comment says so) — key.properties written
+#     below isn't actually read by Gradle yet. Wire that up once a real
+#     keystore exists, alongside adding the KEYSTORE_* secrets.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  BUILD_NUMBER_OFFSET: 0
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  build-android:
+    name: Build Android
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set Up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set Up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Resolve version and build number
+        id: version
+        run: |
+          version=$(grep -m1 '^version:' pubspec.yaml | sed 's/^version:[[:space:]]*//' | cut -d '+' -f 1)
+          build_number=$((BUILD_NUMBER_OFFSET + GITHUB_RUN_NUMBER))
+          echo "VERSION=$version" >> "$GITHUB_OUTPUT"
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_OUTPUT"
+          echo "BASENAME=fridgefriend-app-$version-$build_number" >> "$GITHUB_OUTPUT"
+          echo "Building $version ($build_number)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Decode Keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > android/app/keystore.jks
+
+      - name: Create key.properties
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=keystore.jks" >> android/key.properties
+
+      - name: Build APK
+        run: flutter build apk --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+
+      - name: Build appBundle
+        run: flutter build appbundle --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/${{ steps.version.outputs.BASENAME }}.apk"
+          cp build/app/outputs/bundle/release/app-release.aab "dist/${{ steps.version.outputs.BASENAME }}.aab"
+
+      - name: Distribute to Firebase App Distribution testers
+        if: ${{ secrets.FIREBASE_APP_ID != '' }}
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_CREDENTIALS }}
+          groups: testers
+          file: app/dist/${{ steps.version.outputs.BASENAME }}.apk
+
+      - name: Look for a release matching the pubspec version
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.VERSION }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload to Release
+        if: steps.release.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "v${{ steps.version.outputs.VERSION }}" \
+            "dist/${{ steps.version.outputs.BASENAME }}.apk" \
+            "dist/${{ steps.version.outputs.BASENAME }}.aab" \
+            --clobber
+          echo "Attached to release v${{ steps.version.outputs.VERSION }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload as Build Artifact
+        if: steps.release.outputs.exists == 'false'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.version.outputs.BASENAME }}
+          path: app/dist/
