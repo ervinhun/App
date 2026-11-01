@@ -63,6 +63,7 @@ void main() {
         name: 'Anna G',
       ));
       expect(tokens.token, 'backend-jwt');
+      expect(tokens.refreshToken, 'backend-refresh');
       expect(c.read(authControllerProvider).value, anna);
     });
 
@@ -94,15 +95,36 @@ void main() {
     });
   });
 
-  test('sign out clears the token and the Google account', () async {
-    tokens.token = 'jwt';
-    final c = container();
-    await c.read(authControllerProvider.future);
+  group('sign out', () {
+    test(
+      'ends the backend session, clears the tokens and the Google account',
+      () async {
+        tokens
+          ..token = 'jwt'
+          ..refreshToken = 'refresh';
+        final c = container();
+        await c.read(authControllerProvider.future);
 
-    await c.read(authControllerProvider.notifier).signOut();
+        await c.read(authControllerProvider.notifier).signOut();
 
-    expect(tokens.token, isNull);
-    expect(google.signedOut, isTrue);
-    expect(c.read(authControllerProvider).value, isNull);
+        expect(api.logoutCalls, 1);
+        expect(tokens.token, isNull);
+        expect(tokens.refreshToken, isNull);
+        expect(google.signedOut, isTrue);
+        expect(c.read(authControllerProvider).value, isNull);
+      },
+    );
+
+    test('still signs out locally when the backend is unreachable', () async {
+      tokens.token = 'jwt';
+      api.logoutError = ApiException("Can't reach the server.");
+      final c = container();
+      await c.read(authControllerProvider.future);
+
+      await c.read(authControllerProvider.notifier).signOut();
+
+      expect(tokens.token, isNull);
+      expect(c.read(authControllerProvider).value, isNull);
+    });
   });
 }

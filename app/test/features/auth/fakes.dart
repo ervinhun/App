@@ -12,18 +12,28 @@ const anna = AuthUser(
 );
 
 class FakeTokenStorage extends TokenStorage {
-  FakeTokenStorage([this.token]);
+  FakeTokenStorage([this.token, this.refreshToken]);
 
   String? token;
+  String? refreshToken;
 
   @override
   Future<String?> read() async => token;
 
   @override
-  Future<void> write(String accessToken) async => token = accessToken;
+  Future<String?> readRefreshToken() async => refreshToken;
 
   @override
-  Future<void> clear() async => token = null;
+  Future<void> write({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    token = accessToken;
+    this.refreshToken = refreshToken;
+  }
+
+  @override
+  Future<void> clear() async => token = refreshToken = null;
 }
 
 class FakeAuthApi implements AuthApi {
@@ -33,11 +43,25 @@ class FakeAuthApi implements AuthApi {
   /// Thrown by every sign-in call when set.
   ApiException? signInError;
 
+  /// Thrown by `logout()` when set.
+  ApiException? logoutError;
+
   final externalCalls = <({String provider, String idToken, String? name})>[];
+  int logoutCalls = 0;
 
   AuthSession _session() {
     if (signInError != null) throw signInError!;
-    return const AuthSession(accessToken: 'backend-jwt', user: anna);
+    return const AuthSession(
+      accessToken: 'backend-jwt',
+      refreshToken: 'backend-refresh',
+      user: anna,
+    );
+  }
+
+  @override
+  Future<void> logout() async {
+    logoutCalls++;
+    if (logoutError != null) throw logoutError!;
   }
 
   @override
