@@ -1,10 +1,9 @@
 import 'package:app/core/api/api_client.dart';
+import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
-import 'package:app/features/auth/data/auth_api.dart';
 import 'package:app/features/auth/data/google_auth.dart';
-import 'package:app/features/auth/domain/auth_user.dart';
 
-const anna = AuthUser(
+const anna = UserDto(
   id: '00000000-0000-0000-0000-000000000001',
   email: 'anna@example.com',
   displayName: 'Anna',
@@ -36,7 +35,7 @@ class FakeTokenStorage extends TokenStorage {
   Future<void> clear() async => token = refreshToken = null;
 }
 
-class FakeAuthApi implements AuthApi {
+class FakeAuthClient implements AuthClient {
   /// What `me()` returns for a stored token; an [ApiException] is thrown instead.
   Object meResult = anna;
 
@@ -46,50 +45,47 @@ class FakeAuthApi implements AuthApi {
   /// Thrown by `logout()` when set.
   ApiException? logoutError;
 
-  final externalCalls = <({String provider, String idToken, String? name})>[];
+  final externalCalls = <ExternalLoginRequest>[];
   int logoutCalls = 0;
 
-  AuthSession _session() {
+  AuthResponse _session() {
     if (signInError != null) throw signInError!;
-    return const AuthSession(
+    return AuthResponse(
       accessToken: 'backend-jwt',
+      expiresAt: DateTime.utc(2030),
       refreshToken: 'backend-refresh',
+      refreshTokenExpiresAt: DateTime.utc(2030),
       user: anna,
     );
   }
 
   @override
-  Future<void> logout() async {
-    logoutCalls++;
-    if (logoutError != null) throw logoutError!;
+  Future<UserDto> me() async =>
+      meResult is UserDto ? meResult as UserDto : throw meResult;
+
+  @override
+  Future<AuthResponse> login({required LoginRequest body}) async => _session();
+
+  @override
+  Future<AuthResponse> register({required RegisterRequest body}) async =>
+      _session();
+
+  @override
+  Future<AuthResponse> externalLogin({
+    required ExternalLoginRequest body,
+  }) async {
+    externalCalls.add(body);
+    return _session();
   }
 
   @override
-  Future<AuthUser> me() async =>
-      meResult is AuthUser ? meResult as AuthUser : throw meResult;
+  Future<AuthResponse> refresh({required RefreshRequest body}) =>
+      throw UnimplementedError('AuthInterceptor refreshes, not the client.');
 
   @override
-  Future<AuthSession> login(String email, String password) async => _session();
-
-  @override
-  Future<AuthSession> register({
-    required String email,
-    required String password,
-    required String displayName,
-  }) async => _session();
-
-  @override
-  Future<AuthSession> external({
-    required String provider,
-    required String idToken,
-    String? displayName,
-  }) async {
-    externalCalls.add((
-      provider: provider,
-      idToken: idToken,
-      name: displayName,
-    ));
-    return _session();
+  Future<void> logout() async {
+    logoutCalls++;
+    if (logoutError != null) throw logoutError!;
   }
 }
 

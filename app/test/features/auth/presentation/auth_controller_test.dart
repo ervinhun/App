@@ -1,6 +1,5 @@
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
-import 'package:app/features/auth/data/auth_api.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,20 +9,20 @@ import '../fakes.dart';
 
 void main() {
   late FakeTokenStorage tokens;
-  late FakeAuthApi api;
+  late FakeAuthClient api;
   late FakeGoogleAuth google;
 
   ProviderContainer container() => ProviderContainer.test(
     overrides: [
       tokenStorageProvider.overrideWithValue(tokens),
-      authApiProvider.overrideWithValue(api),
+      authClientProvider.overrideWithValue(api),
       googleAuthProvider.overrideWithValue(google),
     ],
   );
 
   setUp(() {
     tokens = FakeTokenStorage();
-    api = FakeAuthApi();
+    api = FakeAuthClient();
     google = FakeGoogleAuth();
   });
 
@@ -57,11 +56,11 @@ void main() {
           .signInWithGoogle();
 
       expect(signedIn, isTrue);
-      expect(api.externalCalls.single, (
-        provider: 'google',
-        idToken: 'google-id-token',
-        name: 'Anna G',
-      ));
+      final call = api.externalCalls.single;
+      expect(
+        (call.provider, call.idToken, call.displayName, call.platform),
+        ('google', 'google-id-token', 'Anna G', 'android'),
+      );
       expect(tokens.token, 'backend-jwt');
       expect(tokens.refreshToken, 'backend-refresh');
       expect(c.read(authControllerProvider).value, anna);

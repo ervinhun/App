@@ -1,25 +1,28 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/generated/export.dart';
 import '../../../core/auth/token_storage.dart';
-import '../data/auth_api.dart';
 import '../data/google_auth.dart';
-import '../domain/auth_user.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
 ///
 /// Sign-in methods throw [ApiException] (or a Google SDK error) on failure and
 /// leave the state unchanged, so screens can show the error themselves.
-class AuthController extends AsyncNotifier<AuthUser?> {
+class AuthController extends AsyncNotifier<UserDto?> {
   TokenStorage get _tokens => ref.read(tokenStorageProvider);
-  AuthApi get _api => ref.read(authApiProvider);
+  AuthClient get _api => ref.read(authClientProvider);
+
+  /// Sent with every sign-in and stored on the backend's session.
+  String get _platform => defaultTargetPlatform.name.toLowerCase();
 
   @override
-  Future<AuthUser?> build() async {
+  Future<UserDto?> build() async {
     if (await _tokens.read() == null) return null;
     try {
-      return await _api.me();
+      return await apiCall(_api.me());
     } on ApiException catch (e) {
       // The session ended (even a refresh didn't help), or the account was deleted.
       if (e.isUnauthorized) {
@@ -31,17 +34,32 @@ class AuthController extends AsyncNotifier<AuthUser?> {
   }
 
   Future<void> signInWithPassword(String email, String password) async =>
-      _start(await _api.login(email.trim(), password));
+      _start(
+        await apiCall(
+          _api.login(
+            body: LoginRequest(
+              email: email.trim(),
+              password: password,
+              platform: _platform,
+            ),
+          ),
+        ),
+      );
 
   Future<void> register({
     required String email,
     required String password,
     required String displayName,
   }) async => _start(
-    await _api.register(
-      email: email.trim(),
-      password: password,
-      displayName: displayName.trim(),
+    await apiCall(
+      _api.register(
+        body: RegisterRequest(
+          email: email.trim(),
+          password: password,
+          displayName: displayName.trim(),
+          platform: _platform,
+        ),
+      ),
     ),
   );
 
@@ -50,10 +68,15 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     final credential = await ref.read(googleAuthProvider).signIn();
     if (credential == null) return false;
     await _start(
-      await _api.external(
-        provider: 'google',
-        idToken: credential.idToken,
-        displayName: credential.displayName,
+      await apiCall(
+        _api.externalLogin(
+          body: ExternalLoginRequest(
+            provider: 'google',
+            idToken: credential.idToken,
+            displayName: credential.displayName,
+            platform: _platform,
+          ),
+        ),
       ),
     );
     return true;
@@ -62,7 +85,7 @@ class AuthController extends AsyncNotifier<AuthUser?> {
   Future<void> signOut() async {
     if (await _tokens.read() != null) {
       try {
-        await _api.logout();
+        await apiCall(_api.logout());
       } on ApiException {
         // Offline or already signed out: the local sign-out below still happens.
       }
@@ -72,7 +95,7 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     state = const AsyncData(null);
   }
 
-  Future<void> _start(AuthSession session) async {
+  Future<void> _start(AuthResponse session) async {
     await _tokens.write(
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
@@ -81,6 +104,6 @@ class AuthController extends AsyncNotifier<AuthUser?> {
   }
 }
 
-final authControllerProvider = AsyncNotifierProvider<AuthController, AuthUser?>(
+final authControllerProvider = AsyncNotifierProvider<AuthController, UserDto?>(
   AuthController.new,
 );

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../auth/token_storage.dart';
+import 'generated/export.dart';
 
 /// Sends the stored access token as a Bearer token. When the backend answers 401,
 /// swaps the refresh token for a new pair (`POST /api/auth/refresh`) and retries
@@ -71,18 +72,18 @@ class AuthInterceptor extends Interceptor {
       return null;
     }
     try {
+      // Not through AuthClient: this request must skip the interceptor's own handling.
       final response = await _dio.post<Map<String, dynamic>>(
         _refreshPath,
-        data: {'refreshToken': refreshToken},
+        data: RefreshRequest(refreshToken: refreshToken).toJson(),
         options: Options(extra: {_skipAuth: true}),
       );
-      final body = response.data!;
-      final accessToken = body['accessToken'] as String;
+      final session = AuthResponse.fromJson(response.data!);
       await _tokens.write(
-        accessToken: accessToken,
-        refreshToken: body['refreshToken'] as String,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
       );
-      return accessToken;
+      return session.accessToken;
     } on DioException catch (e) {
       // Only a rejected refresh token ends the sign-in; when offline, keep it for later.
       if (e.response?.statusCode == 401) await _tokens.clear();

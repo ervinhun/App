@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/token_storage.dart';
 import 'api_config.dart';
 import 'auth_interceptor.dart';
+import 'generated/export.dart';
 
 /// Dio for the FridgeFriend backend. Signs requests with the stored access token
 /// and refreshes it when it expires (see [AuthInterceptor]).
@@ -19,6 +20,20 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(AuthInterceptor(dio, tokens));
   return dio;
 });
+
+/// The backend's `/api/auth` endpoints, generated from its OpenAPI document.
+final authClientProvider = Provider<AuthClient>(
+  (ref) => AuthClient(ref.watch(dioProvider)),
+);
+
+/// Awaits a generated client call, turning a failed request into an [ApiException].
+Future<T> apiCall<T>(Future<T> request) async {
+  try {
+    return await request;
+  } on DioException catch (e) {
+    throw ApiException.fromDio(e);
+  }
+}
 
 /// A failed backend call, with a message that is safe to show to the user.
 class ApiException implements Exception {

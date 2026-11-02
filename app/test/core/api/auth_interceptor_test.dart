@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:app/core/api/auth_interceptor.dart';
+import 'package:app/core/api/generated/export.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -35,6 +36,15 @@ class FakeAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// The backend's answer to a successful refresh.
+final refreshed = AuthResponse(
+  accessToken: 'new-access',
+  expiresAt: DateTime.utc(2030),
+  refreshToken: 'new-refresh',
+  refreshTokenExpiresAt: DateTime.utc(2030),
+  user: anna,
+);
+
 void main() {
   late FakeTokenStorage tokens;
 
@@ -60,10 +70,7 @@ void main() {
   test('on 401, refreshes once and retries with the new token', () async {
     final adapter = FakeAdapter(
       (r) => switch (r.path) {
-        '/api/auth/refresh' => (
-          200,
-          {'accessToken': 'new-access', 'refreshToken': 'new-refresh'},
-        ),
+        '/api/auth/refresh' => (200, refreshed),
         _ when bearer(r) == 'Bearer new-access' => (200, {'ok': true}),
         _ => (401, null),
       },
@@ -81,10 +88,7 @@ void main() {
   test('concurrent 401s share a single refresh', () async {
     final adapter = FakeAdapter(
       (r) => switch (r.path) {
-        '/api/auth/refresh' => (
-          200,
-          {'accessToken': 'new-access', 'refreshToken': 'new-refresh'},
-        ),
+        '/api/auth/refresh' => (200, refreshed),
         _ when bearer(r) == 'Bearer new-access' => (200, {}),
         _ => (401, null),
       },
