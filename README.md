@@ -27,3 +27,33 @@ flutter run
 
 - Flutter (Android + iOS)
 - Firebase Crashlytics & Analytics
+
+## Planned pages
+- Auth screen (Login, register, forgot password)
+- e-mail verification page (?)
+- New joiners page (You still don't have a fridge/room added - Add your frist fridge/room or join a fridge) - Later might be a demo page, if time permits
+- Main page (Fridge)
+- Add Food (Manual)
+- Open food (take some of it)
+- Notification
+- Pending scans (Only when IoT device is present)
+- Activity log (admins only)
+- Members
+- Management:
+  - Manage fridges (CRUD, re-generate invite code, add IoT device) (Admin only)
+  - Expiry-default overrides (Admin only)
+  - Join fridge page
+  - Manage container (Admin only)
+  - Member rights editor (Admin only)
+  - Remove self
+  - Activity log (Admin only)
+  
+- You:
+  - Password change
+  - Default display name change
+  - e-mail change
+  - delete account / logout (An owner who deletes their account must transfer ownership first, or the fridge ends up with no owner. The docs call this out explicitly.)
+  - Language change
+  - Notification settings
+  - (NOT a seperate page, but we need) - Theme (Light/Dark/Auto)
+  - Optional, flag-gated: an upgrade/paid-tier screen
