@@ -1,0 +1,64 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/auth/presentation/login_screen.dart';
+import 'package:app/features/auth/presentation/startup_error_screen.dart';
+import 'package:app/features/fridges/presentation/fridges_screen.dart';
+
+abstract final class Routes {
+  static const splash = '/splash';
+  static const login = '/login';
+  static const startupError = '/startup-error';
+  static const home = '/';
+}
+
+/// Sends signed-out users to the login screen and signed-in users away from it.
+final routerProvider = Provider<GoRouter>((ref) {
+  // Re-runs `redirect` whenever the auth state changes.
+  final authChanges = ValueNotifier<AsyncValue<Object?>>(
+    ref.read(authControllerProvider),
+  );
+  ref.listen(authControllerProvider, (_, next) => authChanges.value = next);
+  ref.onDispose(authChanges.dispose);
+
+  final router = GoRouter(
+    initialLocation: Routes.splash,
+    refreshListenable: authChanges,
+    redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
+      final at = state.matchedLocation;
+      // Couldn't check the stored token. The user may still be signed in.
+      if (auth.hasError && !auth.hasValue) {
+        return at == Routes.startupError ? null : Routes.startupError;
+      }
+      // Still checking the stored token on startup.
+      if (auth.isLoading && !auth.hasValue) {
+        return at == Routes.splash ? null : Routes.splash;
+      }
+      final signedIn = auth.value != null;
+      if (!signedIn) return at == Routes.login ? null : Routes.login;
+      return (at == Routes.login ||
+              at == Routes.splash ||
+              at == Routes.startupError)
+          ? Routes.home
+          : null;
+    },
+    routes: [
+      GoRoute(
+        path: Routes.splash,
+        builder: (_, _) =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+      ),
+      GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: Routes.startupError,
+        builder: (_, _) => const StartupErrorScreen(),
+      ),
+      GoRoute(path: Routes.home, builder: (_, _) => const FridgesScreen()),
+    ],
+  );
+  ref.onDispose(router.dispose);
+  return router;
+});
