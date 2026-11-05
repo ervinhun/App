@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/auth/token_storage.dart';
-import '../data/auth_api.dart';
-import '../data/google_auth.dart';
-import '../domain/auth_user.dart';
+import 'package:app/core/api/api_client.dart';
+import 'package:app/core/auth/token_storage.dart';
+import 'package:app/features/auth/data/auth_api.dart';
+import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/domain/auth_user.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.

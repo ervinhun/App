@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../auth/token_storage.dart';
+import 'package:app/core/auth/token_storage.dart';
 
 /// Set in a request's `extra` to send it without the access token, for endpoints
 /// that don't take one. A 401 from those says nothing about the session.

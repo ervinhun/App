@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/auth/presentation/auth_controller.dart';
-import '../auth/token_storage.dart';
-import 'api_config.dart';
-import 'auth_interceptor.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/core/auth/token_storage.dart';
+import 'package:app/core/api/api_config.dart';
+import 'package:app/core/api/auth_interceptor.dart';
 
 /// Dio for the FridgeFriend backend. See [AuthInterceptor] for how it handles
 /// the access token.

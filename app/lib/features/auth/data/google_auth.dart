@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../../core/api/api_config.dart';
+import 'package:app/core/api/api_config.dart';
 
 /// The result of the on-device Google sign-in.
 class GoogleCredential {

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/auth/presentation/auth_controller.dart';
-import '../../features/auth/presentation/login_screen.dart';
-import '../../features/auth/presentation/startup_error_screen.dart';
-import '../../features/fridges/presentation/fridges_screen.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/auth/presentation/login_screen.dart';
+import 'package:app/features/auth/presentation/startup_error_screen.dart';
+import 'package:app/features/fridges/presentation/fridges_screen.dart';
 
 abstract final class Routes {
   static const splash = '/splash';

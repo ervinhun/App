@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/router/app_router.dart';
+import 'package:app/core/router/app_router.dart';
 
 void main() {
   runApp(const ProviderScope(child: FridgeFriendApp()));

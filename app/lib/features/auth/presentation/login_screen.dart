@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'auth_controller.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Email/password sign-in and registration, plus "Continue with Google".
 class LoginScreen extends ConsumerStatefulWidget {

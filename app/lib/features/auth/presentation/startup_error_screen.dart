@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
-import 'auth_controller.dart';
+import 'package:app/core/api/api_client.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Shown when the stored tokens couldn't be checked on startup, such as when
 /// offline. The user may still be signed in, so this doesn't ask them to sign in.

@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/api/auth_interceptor.dart';
-import '../domain/auth_user.dart';
+import 'package:app/core/api/api_client.dart';
+import 'package:app/core/api/auth_interceptor.dart';
+import 'package:app/features/auth/domain/auth_user.dart';
 
 /// The backend's `/api/auth` endpoints. Throws [ApiException] on failure.
 class AuthApi {
