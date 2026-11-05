@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/auth_api.dart';
@@ -15,20 +17,37 @@ class FakeTokenStorage extends TokenStorage {
   FakeTokenStorage([this.token]);
 
   String? token;
+  String? refreshToken;
 
   @override
   Future<String?> read() async => token;
 
   @override
-  Future<void> write(String accessToken) async => token = accessToken;
+  Future<String?> readRefreshToken() async => refreshToken;
 
   @override
-  Future<void> clear() async => token = null;
+  Future<void> write({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    token = accessToken;
+    this.refreshToken = refreshToken;
+  }
+
+  @override
+  Future<void> clear() async {
+    token = null;
+    refreshToken = null;
+  }
 }
 
 class FakeAuthApi implements AuthApi {
   /// What `me()` returns for a stored token; an [ApiException] is thrown instead.
   Object meResult = anna;
+  int meCalls = 0;
+
+  /// When set, `me()` waits for this before answering.
+  Completer<void>? meGate;
 
   /// Thrown by every sign-in call when set.
   ApiException? signInError;
@@ -37,12 +56,19 @@ class FakeAuthApi implements AuthApi {
 
   AuthSession _session() {
     if (signInError != null) throw signInError!;
-    return const AuthSession(accessToken: 'backend-jwt', user: anna);
+    return const AuthSession(
+      accessToken: 'backend-jwt',
+      refreshToken: 'backend-refresh',
+      user: anna,
+    );
   }
 
   @override
-  Future<AuthUser> me() async =>
-      meResult is AuthUser ? meResult as AuthUser : throw meResult;
+  Future<AuthUser> me() async {
+    meCalls++;
+    await meGate?.future;
+    return meResult is AuthUser ? meResult as AuthUser : throw meResult;
+  }
 
   @override
   Future<AuthSession> login(String email, String password) async => _session();
@@ -77,9 +103,15 @@ class FakeGoogleAuth implements GoogleAuth {
   );
   bool signedOut = false;
 
+  /// Thrown by `signOut()` when set.
+  Exception? signOutError;
+
   @override
   Future<GoogleCredential?> signIn() async => credential;
 
   @override
-  Future<void> signOut() async => signedOut = true;
+  Future<void> signOut() async {
+    if (signOutError != null) throw signOutError!;
+    signedOut = true;
+  }
 }

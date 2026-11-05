@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/startup_error_screen.dart';
 import '../../features/fridges/presentation/fridges_screen.dart';
 
 abstract final class Routes {
   static const splash = '/splash';
   static const login = '/login';
+  static const startupError = '/startup-error';
   static const home = '/';
 }
 
@@ -27,13 +29,21 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final at = state.matchedLocation;
+      // Couldn't check the stored token. The user may still be signed in.
+      if (auth.hasError && !auth.hasValue) {
+        return at == Routes.startupError ? null : Routes.startupError;
+      }
       // Still checking the stored token on startup.
       if (auth.isLoading && !auth.hasValue) {
         return at == Routes.splash ? null : Routes.splash;
       }
       final signedIn = auth.value != null;
       if (!signedIn) return at == Routes.login ? null : Routes.login;
-      return (at == Routes.login || at == Routes.splash) ? Routes.home : null;
+      return (at == Routes.login ||
+              at == Routes.splash ||
+              at == Routes.startupError)
+          ? Routes.home
+          : null;
     },
     routes: [
       GoRoute(
@@ -42,6 +52,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: Routes.startupError,
+        builder: (_, _) => const StartupErrorScreen(),
+      ),
       GoRoute(path: Routes.home, builder: (_, _) => const FridgesScreen()),
     ],
   );

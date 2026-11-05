@@ -20,15 +20,21 @@ class AuthUser {
   final String locale;
 }
 
-/// The backend's `AuthResponse`: our own access token plus the user it belongs to.
+/// The backend's `AuthResponse`: our own tokens plus the user they belong to.
 class AuthSession {
-  const AuthSession({required this.accessToken, required this.user});
+  const AuthSession({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.user,
+  });
 
   factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
     accessToken: json['accessToken'] as String,
+    refreshToken: json['refreshToken'] as String,
     user: AuthUser.fromJson(json['user'] as Map<String, dynamic>),
   );
 
   final String accessToken;
+  final String refreshToken;
   final AuthUser user;
 }

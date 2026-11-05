@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/auth_api.dart';
@@ -63,6 +65,7 @@ void main() {
         name: 'Anna G',
       ));
       expect(tokens.token, 'backend-jwt');
+      expect(tokens.refreshToken, 'backend-refresh');
       expect(c.read(authControllerProvider).value, anna);
     });
 
@@ -96,13 +99,65 @@ void main() {
 
   test('sign out clears the token and the Google account', () async {
     tokens.token = 'jwt';
+    tokens.refreshToken = 'refresh';
     final c = container();
     await c.read(authControllerProvider.future);
 
     await c.read(authControllerProvider.notifier).signOut();
 
     expect(tokens.token, isNull);
+    expect(tokens.refreshToken, isNull);
     expect(google.signedOut, isTrue);
+    expect(c.read(authControllerProvider).value, isNull);
+  });
+
+  group('signing out during the startup check', () {
+    Future<void> signOutWhileCheckingThenAnswer(Object meResult) async {
+      tokens.token = 'jwt';
+      api.meGate = Completer();
+      final c = ProviderContainer.test(
+        retry: (_, _) => null,
+        overrides: [
+          tokenStorageProvider.overrideWithValue(tokens),
+          authApiProvider.overrideWithValue(api),
+          googleAuthProvider.overrideWithValue(google),
+        ],
+      );
+      c.listen(authControllerProvider, (_, _) {});
+      await pumpEventQueue();
+
+      await c.read(authControllerProvider.notifier).signOut();
+      api.meResult = meResult;
+      api.meGate!.complete();
+      await pumpEventQueue();
+
+      final auth = c.read(authControllerProvider);
+      expect(auth.value, isNull);
+      expect(auth.hasError, isFalse);
+      expect(auth.isLoading, isFalse);
+    }
+
+    test('is not undone by a late failure', () async {
+      await signOutWhileCheckingThenAnswer(ApiException('offline'));
+    });
+
+    test('is not undone by a late success', () async {
+      await signOutWhileCheckingThenAnswer(anna);
+    });
+  });
+
+  test('a Google failure still signs out of the app', () async {
+    tokens.token = 'jwt';
+    google.signOutError = Exception('Google is unavailable');
+    final c = container();
+    await c.read(authControllerProvider.future);
+
+    await expectLater(
+      c.read(authControllerProvider.notifier).signOut(),
+      throwsException,
+    );
+
+    expect(tokens.token, isNull);
     expect(c.read(authControllerProvider).value, isNull);
   });
 }

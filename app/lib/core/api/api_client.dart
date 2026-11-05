@@ -1,11 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/auth/presentation/auth_controller.dart';
 import '../auth/token_storage.dart';
 import 'api_config.dart';
+import 'auth_interceptor.dart';
 
-/// Dio for the FridgeFriend backend. Sends the stored access token, if any, as a
-/// Bearer token on every request.
+/// Dio for the FridgeFriend backend. See [AuthInterceptor] for how it handles
+/// the access token.
 final dioProvider = Provider<Dio>((ref) {
   final tokens = ref.watch(tokenStorageProvider);
   final dio = Dio(
@@ -16,12 +18,10 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
   dio.interceptors.add(
-    InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final token = await tokens.read();
-        if (token != null) options.headers['Authorization'] = 'Bearer $token';
-        handler.next(options);
-      },
+    AuthInterceptor(
+      dio,
+      tokens,
+      onSessionEnded: () => ref.read(authControllerProvider.notifier).signOut(),
     ),
   );
   return dio;

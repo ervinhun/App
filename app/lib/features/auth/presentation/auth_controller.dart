@@ -21,7 +21,7 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     try {
       return await _api.me();
     } on ApiException catch (e) {
-      // Expired token, or the account was deleted.
+      // The session ended, or the account was deleted.
       if (e.isUnauthorized) {
         await _tokens.clear();
         return null;
@@ -60,13 +60,19 @@ class AuthController extends AsyncNotifier<AuthUser?> {
   }
 
   Future<void> signOut() async {
+    final google = ref.read(googleAuthProvider);
     await _tokens.clear();
-    await ref.read(googleAuthProvider).signOut();
     state = const AsyncData(null);
+    // Cancels a startup check still running, whose late result would undo this.
+    ref.invalidateSelf();
+    await google.signOut();
   }
 
   Future<void> _start(AuthSession session) async {
-    await _tokens.write(session.accessToken);
+    await _tokens.write(
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+    );
     state = AsyncData(session.user);
   }
 }
