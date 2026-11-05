@@ -103,11 +103,17 @@ class FakeGoogleAuth implements GoogleAuth {
   );
   bool signedOut = false;
 
+  /// Thrown by `signIn()` when set.
+  Object? signInError;
+
   /// Thrown by `signOut()` when set.
   Exception? signOutError;
 
   @override
-  Future<GoogleCredential?> signIn() async => credential;
+  Future<GoogleCredential?> signIn() async {
+    if (signInError != null) throw signInError!;
+    return credential;
+  }
 
   @override
   Future<void> signOut() async {

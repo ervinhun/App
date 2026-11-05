@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:app/core/api/api_client.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Email/password sign-in and registration, plus "Continue with Google".
@@ -43,7 +44,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await action();
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (e is! ApiException) debugPrint('Sign-in failed: $e');
+      if (mounted) setState(() => _error = ApiException.messageFor(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

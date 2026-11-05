@@ -15,7 +15,6 @@ class StartupErrorScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
-    final error = auth.error;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -33,9 +32,7 @@ class StartupErrorScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 32),
                   Text(
-                    error is ApiException
-                        ? error.message
-                        : 'Something went wrong. Please try again.',
+                    ApiException.messageFor(auth.error),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),

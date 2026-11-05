@@ -62,6 +62,12 @@ class ApiException implements Exception {
     return ApiException('Something went wrong ($status).', statusCode: status);
   }
 
+  /// What to tell the user about [error]. Only an [ApiException] has a message
+  /// that is safe to show.
+  static String messageFor(Object? error) => error is ApiException
+      ? error.message
+      : 'Something went wrong. Please try again.';
+
   @override
   String toString() => message;
 }
