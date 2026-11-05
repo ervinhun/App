@@ -11,7 +11,8 @@ The Flutter project lives in [`app/`](app/). Follow the instructions in [`app/RE
 ```sh
 cd app
 flutter pub get
-flutter run
+cp .env.example .env # then fill in the values
+flutter run --dart-define-from-file=.env
 ```
 
 ## CI/CD
