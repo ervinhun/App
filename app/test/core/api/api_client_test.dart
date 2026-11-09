@@ -38,6 +38,9 @@ class _FakeBackend implements HttpClientAdapter {
   /// Issues new tokens as usual, but never accepts them.
   bool rejectNewTokens = false;
 
+  /// Answers refreshes with a body that has no tokens.
+  bool malformedRefresh = false;
+
   /// What non-auth endpoints answer with a valid token.
   int status = 200;
   int loginStatus = 200;
@@ -89,6 +92,7 @@ class _FakeBackend implements HttpClientAdapter {
       );
     }
     if (refreshStatus != null) return _json(refreshStatus!, const {});
+    if (malformedRefresh) return _json(200, const {});
     if ((options.data as Map)['refreshToken'] != refresh) {
       return _json(401, const {});
     }
@@ -262,6 +266,37 @@ void main() {
     });
   });
 
+  group('the caller gets the real error when', () {
+    Matcher causedBy<T>() =>
+        isA<DioException>().having((e) => e.error, 'error', isA<T>());
+
+    test('secure storage fails during a refresh', () async {
+      tokens = _BrokenRefreshTokenStorage(backend.access);
+      final c = await started();
+      backend.expireAccessToken();
+
+      await expectLater(
+        c.read(dioProvider).get<void>(_fridges),
+        throwsA(causedBy<StateError>()),
+      );
+      expect(backend.refreshCalls, 0);
+    });
+
+    test('the refresh response has no tokens', () async {
+      final c = await started();
+      backend.expireAccessToken();
+      backend.malformedRefresh = true;
+      final staleAccess = tokens.token;
+
+      await expectLater(
+        c.read(dioProvider).get<void>(_fridges),
+        throwsA(causedBy<TypeError>()),
+      );
+      expect(tokens.token, staleAccess);
+      expect(signedInId(c), anna.id);
+    });
+  });
+
   group('the session survives', () {
     test('having no connection during a refresh, and recovers', () async {
       final c = await started();
@@ -395,4 +430,13 @@ void main() {
       expect(google.signedOut, isFalse);
     });
   });
+}
+
+/// Has an access token, but reading the refresh token always fails.
+class _BrokenRefreshTokenStorage extends FakeTokenStorage {
+  _BrokenRefreshTokenStorage(super.token);
+
+  @override
+  Future<String?> readRefreshToken() async =>
+      throw StateError('Keychain unavailable');
 }

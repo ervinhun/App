@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:app/core/auth/token_storage.dart';
 
@@ -60,10 +61,17 @@ class AuthInterceptor extends Interceptor {
       }
     } on DioException catch (e) {
       handler.next(e);
-    } catch (_) {
-      // Storage or sign-out failed: still finish the request, and report it.
-      handler.next(err);
-      rethrow;
+    } catch (e, stackTrace) {
+      // Anything else, such as secure storage, a malformed refresh response or
+      // sign-out failing. The caller gets this error, not the original 401.
+      debugPrint('Recovering from a 401 failed: $e\n$stackTrace');
+      handler.reject(
+        DioException(
+          requestOptions: err.requestOptions,
+          error: e,
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
