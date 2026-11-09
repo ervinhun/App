@@ -99,11 +99,20 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=keystore.jks" >> android/key.properties
 
+      - name: Check build configuration
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: |
+          if [ -z "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            echo "::error::Set the GOOGLE_SERVER_CLIENT_ID repository variable."
+            exit 1
+          fi
+
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+        run: flutter build apk --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }}
 
       - name: Build appBundle
-        run: flutter build appbundle --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }}
+        run: flutter build appbundle --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }}
 
       - name: Collect artifacts
         run: |
