@@ -290,10 +290,31 @@ void main() {
 
       await expectLater(
         c.read(dioProvider).get<void>(_fridges),
-        throwsA(causedBy<TypeError>()),
+        throwsA(
+          isA<DioException>()
+              .having((e) => e.type, 'type', DioExceptionType.badResponse)
+              .having((e) => e.response?.statusCode, 'statusCode', 200),
+        ),
       );
       expect(tokens.token, staleAccess);
       expect(signedInId(c), anna.id);
+    });
+
+    test('the refresh response has no tokens at startup', () async {
+      tokens.token = 'expired-jwt';
+      backend.malformedRefresh = true;
+
+      await expectLater(
+        container(retry: (_, _) => null).read(authControllerProvider.future),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            isNot(contains("Can't reach the server")),
+          ),
+        ),
+      );
+      expect(tokens.refreshToken, isNotNull);
     });
   });
 

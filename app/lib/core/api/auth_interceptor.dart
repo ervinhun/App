@@ -62,8 +62,8 @@ class AuthInterceptor extends Interceptor {
     } on DioException catch (e) {
       handler.next(e);
     } catch (e, stackTrace) {
-      // Anything else, such as secure storage, a malformed refresh response or
-      // sign-out failing. The caller gets this error, not the original 401.
+      // Anything else, such as secure storage or sign-out failing. The caller
+      // gets this error, not the original 401.
       debugPrint('Recovering from a 401 failed: $e\n$stackTrace');
       handler.reject(
         DioException(
@@ -107,14 +107,13 @@ class AuthInterceptor extends Interceptor {
       return false;
     }
 
-    final Map<String, dynamic> session;
+    final Response<Map<String, dynamic>> response;
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
+      response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/refresh',
         data: {'refreshToken': refreshToken},
         options: Options(extra: {skipAuth: true}),
       );
-      session = response.data!;
     } on DioException catch (e) {
       if (e.response?.statusCode != 401) rethrow;
       if (await _tokens.readRefreshToken() == refreshToken) {
@@ -123,14 +122,24 @@ class AuthInterceptor extends Interceptor {
       return false;
     }
 
+    final newAccessToken = response.data?['accessToken'];
+    final newRefreshToken = response.data?['refreshToken'];
+    if (newAccessToken is! String || newRefreshToken is! String) {
+      // The server answered, so this must not reach the user as a network error.
+      throw DioException.badResponse(
+        statusCode: response.statusCode ?? 200,
+        requestOptions: response.requestOptions,
+        response: response,
+      );
+    }
+
     // The user signed out or started another session during the refresh, so
     // saving these tokens would undo that.
     if (await _tokens.readRefreshToken() != refreshToken) return false;
 
-    final newAccessToken = session['accessToken'] as String;
     await _tokens.write(
       accessToken: newAccessToken,
-      refreshToken: session['refreshToken'] as String,
+      refreshToken: newRefreshToken,
     );
     _lastSwap = (from: accessToken, to: newAccessToken);
     return true;
