@@ -87,7 +87,7 @@ void main() {
         confirmation: 'correct-horse',
       );
 
-      expect(find.text('Signed in as Anna'), findsOneWidget);
+      expect(find.text('First dibs'), findsOneWidget);
     });
 
     testWidgets('stops when the passwords differ', (tester) async {
@@ -98,7 +98,7 @@ void main() {
       );
 
       expect(find.text("Passwords don't match"), findsOneWidget);
-      expect(find.text('Signed in as Anna'), findsNothing);
+      expect(find.text('First dibs'), findsNothing);
     });
   });
 

@@ -67,7 +67,7 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
     await pumpABit(tester);
 
-    expect(find.text('Signed in as Anna'), findsOneWidget);
+    expect(find.text('First dibs'), findsOneWidget);
   });
 
   group('Try again', () {
@@ -78,7 +78,7 @@ void main() {
       await tester.tap(find.text('Try again'));
       await pumpABit(tester);
 
-      expect(find.text('Signed in as Anna'), findsOneWidget);
+      expect(find.text('First dibs'), findsOneWidget);
     });
 
     testWidgets('comes back here if it fails again', (tester) async {

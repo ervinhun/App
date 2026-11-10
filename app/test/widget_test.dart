@@ -1,11 +1,13 @@
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
+import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'core/storage/fake_hint_storage.dart';
 import 'features/auth/fakes.dart';
 
 void main() {
@@ -20,6 +22,7 @@ void main() {
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
+          hintStorageProvider.overrideWithValue(FakeHintStorage()),
         ],
         child: const FridgeFriendApp(),
       ),
@@ -47,7 +50,8 @@ void main() {
     tokens.token = 'jwt';
     await pumpApp(tester);
 
-    expect(find.text('Signed in as Anna'), findsOneWidget);
+    expect(find.text('First dibs'), findsOneWidget);
+    expect(find.textContaining('HELLO, ANNA!'), findsOneWidget);
   }, variant: android);
 
   testWidgets('Continue with Google signs in, sign out returns to login', (
@@ -56,6 +60,10 @@ void main() {
     await pumpApp(tester);
 
     await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('First dibs'), findsOneWidget);
+
+    await tester.tap(find.text('You'));
     await tester.pumpAndSettle();
     expect(find.text('Signed in as Anna'), findsOneWidget);
 
