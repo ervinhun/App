@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/presentation/auth_controller.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Placeholder home screen until the fridges feature exists.
 class FridgesScreen extends ConsumerWidget {

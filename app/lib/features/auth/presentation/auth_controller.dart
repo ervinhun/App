@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/api_client.dart';
-import '../../../core/api/generated/export.dart';
-import '../../../core/auth/token_storage.dart';
-import '../data/google_auth.dart';
+import 'package:app/core/api/api_client.dart';
+import 'package:app/core/api/generated/export.dart';
+import 'package:app/core/auth/token_storage.dart';
+import 'package:app/features/auth/data/google_auth.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
@@ -14,6 +14,7 @@ import '../data/google_auth.dart';
 class AuthController extends AsyncNotifier<UserDto?> {
   TokenStorage get _tokens => ref.read(tokenStorageProvider);
   AuthClient get _api => ref.read(authClientProvider);
+  AuthClient get _signIn => ref.read(signInClientProvider);
 
   /// Sent with every sign-in and stored on the backend's session.
   String get _platform => defaultTargetPlatform.name.toLowerCase();
@@ -24,7 +25,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
     try {
       return await apiCall(_api.me());
     } on ApiException catch (e) {
-      // The session ended (even a refresh didn't help), or the account was deleted.
+      // The session ended, or the account was deleted.
       if (e.isUnauthorized) {
         await _tokens.clear();
         return null;
@@ -36,7 +37,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
   Future<void> signInWithPassword(String email, String password) async =>
       _start(
         await apiCall(
-          _api.login(
+          _signIn.login(
             body: LoginRequest(
               email: email.trim(),
               password: password,
@@ -52,7 +53,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
     required String displayName,
   }) async => _start(
     await apiCall(
-      _api.register(
+      _signIn.register(
         body: RegisterRequest(
           email: email.trim(),
           password: password,
@@ -69,7 +70,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
     if (credential == null) return false;
     await _start(
       await apiCall(
-        _api.externalLogin(
+        _signIn.externalLogin(
           body: ExternalLoginRequest(
             provider: 'google',
             idToken: credential.idToken,
@@ -82,6 +83,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
     return true;
   }
 
+  /// Ends the backend session too, then signs out here even if that failed.
   Future<void> signOut() async {
     if (await _tokens.read() != null) {
       try {
@@ -90,9 +92,19 @@ class AuthController extends AsyncNotifier<UserDto?> {
         // Offline or already signed out: the local sign-out below still happens.
       }
     }
+    await endSession();
+  }
+
+  /// Signs out on this device only, for when the backend already ended the
+  /// session. Unlike [signOut] it sends no request, so `AuthInterceptor` can
+  /// call it while a refresh is in flight.
+  Future<void> endSession() async {
+    final google = ref.read(googleAuthProvider);
     await _tokens.clear();
-    await ref.read(googleAuthProvider).signOut();
     state = const AsyncData(null);
+    // Cancels a startup check still running, whose late result would undo this.
+    ref.invalidateSelf();
+    await google.signOut();
   }
 
   Future<void> _start(AuthResponse session) async {

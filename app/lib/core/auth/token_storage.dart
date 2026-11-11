@@ -21,8 +21,10 @@ class TokenStorage {
     required String accessToken,
     required String refreshToken,
   }) async {
-    await _storage.write(key: _accessTokenKey, value: accessToken);
+    // Refresh token first: it is single use, so losing the new one to a crash
+    // would end the session, while an old access token just gets refreshed.
     await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    await _storage.write(key: _accessTokenKey, value: accessToken);
   }
 
   Future<void> clear() async {

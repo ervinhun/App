@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'auth_controller.dart';
+import 'package:app/core/api/api_client.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Email/password sign-in and registration, plus "Continue with Google".
 class LoginScreen extends ConsumerStatefulWidget {
@@ -21,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   final _displayName = TextEditingController();
 
   bool _registering = false;
@@ -31,6 +33,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     _displayName.dispose();
     super.dispose();
   }
@@ -43,7 +46,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await action();
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (e is! ApiException) debugPrint('Sign-in failed: $e');
+      if (mounted) setState(() => _error = ApiException.messageFor(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -114,11 +118,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: const InputDecoration(labelText: 'Password'),
                       obscureText: true,
                       autofillHints: const [AutofillHints.password],
-                      onFieldSubmitted: (_) => _submit(),
+                      textInputAction: _registering
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      onFieldSubmitted: _registering ? null : (_) => _submit(),
                       validator: (v) => (v == null || v.length < 8)
                           ? 'At least 8 characters'
                           : null,
                     ),
+                    if (_registering) ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPassword,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm password',
+                        ),
+                        obscureText: true,
+                        onFieldSubmitted: (_) => _submit(),
+                        validator: (v) => v != _password.text
+                            ? "Passwords don't match"
+                            : null,
+                      ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Text(

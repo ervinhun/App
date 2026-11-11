@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
@@ -32,12 +34,19 @@ class FakeTokenStorage extends TokenStorage {
   }
 
   @override
-  Future<void> clear() async => token = refreshToken = null;
+  Future<void> clear() async {
+    token = null;
+    refreshToken = null;
+  }
 }
 
 class FakeAuthClient implements AuthClient {
   /// What `me()` returns for a stored token; an [ApiException] is thrown instead.
   Object meResult = anna;
+  int meCalls = 0;
+
+  /// When set, `me()` waits for this before answering.
+  Completer<void>? meGate;
 
   /// Thrown by every sign-in call when set.
   ApiException? signInError;
@@ -60,8 +69,11 @@ class FakeAuthClient implements AuthClient {
   }
 
   @override
-  Future<UserDto> me() async =>
-      meResult is UserDto ? meResult as UserDto : throw meResult;
+  Future<UserDto> me() async {
+    meCalls++;
+    await meGate?.future;
+    return meResult is UserDto ? meResult as UserDto : throw meResult;
+  }
 
   @override
   Future<AuthResponse> login({required LoginRequest body}) async => _session();
@@ -97,9 +109,21 @@ class FakeGoogleAuth implements GoogleAuth {
   );
   bool signedOut = false;
 
-  @override
-  Future<GoogleCredential?> signIn() async => credential;
+  /// Thrown by `signIn()` when set.
+  Object? signInError;
+
+  /// Thrown by `signOut()` when set.
+  Exception? signOutError;
 
   @override
-  Future<void> signOut() async => signedOut = true;
+  Future<GoogleCredential?> signIn() async {
+    if (signInError != null) throw signInError!;
+    return credential;
+  }
+
+  @override
+  Future<void> signOut() async {
+    if (signOutError != null) throw signOutError!;
+    signedOut = true;
+  }
 }

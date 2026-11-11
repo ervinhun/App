@@ -1,29 +1,46 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../auth/token_storage.dart';
-import 'api_config.dart';
-import 'auth_interceptor.dart';
-import 'generated/export.dart';
+import 'package:app/core/api/api_config.dart';
+import 'package:app/core/api/auth_interceptor.dart';
+import 'package:app/core/api/generated/export.dart';
+import 'package:app/core/auth/token_storage.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
 
-/// Dio for the FridgeFriend backend. Signs requests with the stored access token
-/// and refreshes it when it expires (see [AuthInterceptor]).
+Dio _backendDio() => Dio(
+  BaseOptions(
+    baseUrl: ApiConfig.baseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 15),
+  ),
+);
+
+/// Dio for the FridgeFriend backend. See [AuthInterceptor] for how it handles
+/// the access token.
 final dioProvider = Provider<Dio>((ref) {
   final tokens = ref.watch(tokenStorageProvider);
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
+  final dio = _backendDio();
+  dio.interceptors.add(
+    AuthInterceptor(
+      dio,
+      tokens,
+      onSessionEnded: () =>
+          ref.read(authControllerProvider.notifier).endSession(),
     ),
   );
-  dio.interceptors.add(AuthInterceptor(dio, tokens));
   return dio;
 });
 
 /// The backend's `/api/auth` endpoints, generated from its OpenAPI document.
 final authClientProvider = Provider<AuthClient>(
   (ref) => AuthClient(ref.watch(dioProvider)),
+);
+
+/// [AuthClient] for signing in, which sends no access token: a 401 there means
+/// wrong credentials, not an expired session. The generated client can't mark
+/// a request with [skipAuth], so it gets a Dio without [AuthInterceptor].
+final signInClientProvider = Provider<AuthClient>(
+  (ref) => AuthClient(_backendDio()),
 );
 
 /// Awaits a generated client call, turning a failed request into an [ApiException].
@@ -69,6 +86,12 @@ class ApiException implements Exception {
     }
     return ApiException('Something went wrong ($status).', statusCode: status);
   }
+
+  /// What to tell the user about [error]. Only an [ApiException] has a message
+  /// that is safe to show.
+  static String messageFor(Object? error) => error is ApiException
+      ? error.message
+      : 'Something went wrong. Please try again.';
 
   @override
   String toString() => message;

@@ -18,6 +18,7 @@ void main() {
         overrides: [
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
+          signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
         ],
         child: const FridgeFriendApp(),
