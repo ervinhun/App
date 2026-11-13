@@ -86,7 +86,11 @@ class FoodItem {
   /// shelf life once open, or by its printed date if that comes first.
   FoodItem opened(DateTime today) {
     final day = DateTime(today.year, today.month, today.day);
-    final eatBy = day.add(Duration(days: _openedShelfLifeDays[category]!));
+    final eatBy = DateTime(
+      day.year,
+      day.month,
+      day.day + _openedShelfLifeDays[category]!,
+    );
     return FoodItem(
       id: id,
       name: name,

@@ -41,9 +41,13 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
   /// kept.
   String? _typeNote;
 
-  DateTime get _today {
+  DateTime get _today => _daysFromToday(0);
+
+  /// Calendar days, not 24-hour periods, so it stays on midnight across a
+  /// daylight-saving change.
+  DateTime _daysFromToday(int days) {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return DateTime(now.year, now.month, now.day + days);
   }
 
   @override
@@ -77,7 +81,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
   void _suggestDate() {
     final days = _type?.expiryDaysIn(_storage);
     if (days == null || _datePicked) return;
-    _bestBefore = _today.add(Duration(days: days));
+    _bestBefore = _daysFromToday(days);
   }
 
   /// The picker only offers what's kept in [storage], so a type that isn't is
@@ -104,8 +108,8 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
     final date = await showDatePicker(
       context: context,
       initialDate: _bestBefore ?? today,
-      firstDate: today.subtract(const Duration(days: 30)),
-      lastDate: today.add(const Duration(days: 365 * 5)),
+      firstDate: _daysFromToday(-30),
+      lastDate: _daysFromToday(365 * 5),
       helpText: 'Best before',
     );
     if (date == null) return;
@@ -131,11 +135,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
       storage: _storage,
       bestBefore:
           _bestBefore ??
-          _today.add(
-            Duration(
-              days: type.expiryDaysIn(_storage) ?? type.defaultExpiryDays,
-            ),
-          ),
+          _daysFromToday(type.expiryDaysIn(_storage) ?? type.defaultExpiryDays),
     );
     ref.read(foodItemsProvider.notifier).add(item);
     context.pop(item);
