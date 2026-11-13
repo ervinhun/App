@@ -46,7 +46,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _showSnackBar(Widget content, {SnackBarAction? action}) {
     _messenger.currentState!
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: content, action: action));
+      ..showSnackBar(
+        SnackBar(
+          content: content,
+          action: action,
+          persist: false,
+          duration: const Duration(seconds: 5),
+        ),
   }
 
   void _showUndo(String message, VoidCallback undo) => _showSnackBar(
