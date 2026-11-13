@@ -1,6 +1,5 @@
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
-import 'package:app/features/auth/data/auth_api.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/main.dart';
 import 'package:flutter/material.dart';
@@ -10,11 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes.dart';
 
 void main() {
-  late FakeAuthApi api;
+  late FakeAuthClient api;
   late FakeGoogleAuth google;
 
   setUp(() {
-    api = FakeAuthApi();
+    api = FakeAuthClient();
     google = FakeGoogleAuth();
   });
 
@@ -23,7 +22,8 @@ void main() {
       ProviderScope(
         overrides: [
           tokenStorageProvider.overrideWithValue(FakeTokenStorage()),
-          authApiProvider.overrideWithValue(api),
+          authClientProvider.overrideWithValue(api),
+          signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(google),
         ],
         child: const FridgeFriendApp(),
@@ -87,7 +87,7 @@ void main() {
         confirmation: 'correct-horse',
       );
 
-      expect(find.text('Signed in as Anna'), findsOneWidget);
+      expect(find.text('First dibs'), findsOneWidget);
     });
 
     testWidgets('stops when the passwords differ', (tester) async {
@@ -98,7 +98,7 @@ void main() {
       );
 
       expect(find.text("Passwords don't match"), findsOneWidget);
-      expect(find.text('Signed in as Anna'), findsNothing);
+      expect(find.text('First dibs'), findsNothing);
     });
   });
 

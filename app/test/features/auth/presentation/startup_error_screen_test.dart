@@ -1,6 +1,5 @@
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
-import 'package:app/features/auth/data/auth_api.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/main.dart';
 import 'package:flutter/material.dart';
@@ -13,11 +12,11 @@ const _offlineMessage = "Can't reach the server.";
 
 void main() {
   late FakeTokenStorage tokens;
-  late FakeAuthApi api;
+  late FakeAuthClient api;
 
   setUp(() {
     tokens = FakeTokenStorage('jwt')..refreshToken = 'refresh';
-    api = FakeAuthApi()..meResult = ApiException(_offlineMessage);
+    api = FakeAuthClient()..meResult = ApiException(_offlineMessage);
   });
 
   /// Not pumpAndSettle: the progress bar animates for as long as a retry runs.
@@ -33,7 +32,8 @@ void main() {
         retry: autoRetry ? null : (_, _) => null,
         overrides: [
           tokenStorageProvider.overrideWithValue(tokens),
-          authApiProvider.overrideWithValue(api),
+          authClientProvider.overrideWithValue(api),
+          signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
         ],
         child: const FridgeFriendApp(),
@@ -67,7 +67,7 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
     await pumpABit(tester);
 
-    expect(find.text('Signed in as Anna'), findsOneWidget);
+    expect(find.text('First dibs'), findsOneWidget);
   });
 
   group('Try again', () {
@@ -78,7 +78,7 @@ void main() {
       await tester.tap(find.text('Try again'));
       await pumpABit(tester);
 
-      expect(find.text('Signed in as Anna'), findsOneWidget);
+      expect(find.text('First dibs'), findsOneWidget);
     });
 
     testWidgets('comes back here if it fails again', (tester) async {

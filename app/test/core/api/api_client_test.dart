@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:app/core/api/api_client.dart';
+import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
@@ -30,6 +31,7 @@ class _FakeBackend implements HttpClientAdapter {
   var _issued = 0;
 
   int refreshCalls = 0;
+  int logoutCalls = 0;
 
   /// The refresh endpoint fails this way instead of answering.
   int? refreshStatus;
@@ -64,9 +66,12 @@ class _FakeBackend implements HttpClientAdapter {
   ) async {
     await Future<void>.delayed(Duration.zero);
     final authorization = options.headers['Authorization'];
+    // Routes are case-insensitive on the backend, and the generated client
+    // capitalizes them.
+    final path = options.path.toLowerCase();
 
-    if (options.path == '/api/auth/refresh') return _refresh(options);
-    if (options.path == '/api/auth/login') {
+    if (path == '/api/auth/refresh') return _refresh(options);
+    if (path == '/api/auth/login') {
       loginAuthorization = authorization as String?;
       return loginStatus == 200
           ? _json(200, _session('login-jwt', 'login-refresh'))
@@ -77,7 +82,11 @@ class _FakeBackend implements HttpClientAdapter {
     if (options.path == _slow) await slowGate.future;
 
     if (authorization != 'Bearer $access') return _json(401, const {});
-    return options.path == '/api/auth/me'
+    if (path == '/api/auth/logout') {
+      logoutCalls++;
+      return ResponseBody.fromString('', 204);
+    }
+    return path == '/api/auth/me'
         ? _json(200, _annaJson)
         : _json(status, const {});
   }
@@ -106,7 +115,9 @@ class _FakeBackend implements HttpClientAdapter {
 
   Map<String, dynamic> _session(String accessToken, String refreshToken) => {
     'accessToken': accessToken,
+    'expiresAt': '2030-01-01T00:00:00Z',
     'refreshToken': refreshToken,
+    'refreshTokenExpiresAt': '2030-01-01T00:00:00Z',
     'user': _annaJson,
   };
 
@@ -140,6 +151,9 @@ void main() {
       overrides: [
         tokenStorageProvider.overrideWithValue(tokens),
         googleAuthProvider.overrideWithValue(google),
+        signInClientProvider.overrideWithValue(
+          AuthClient(Dio()..httpClientAdapter = backend),
+        ),
       ],
     );
     c.read(dioProvider).httpClientAdapter = backend;
@@ -230,6 +244,9 @@ void main() {
       );
       expectSignedOut(c);
       expect(google.signedOut, isTrue);
+      // The backend already ended the session, and a logout sent from inside
+      // the refresh would wait for that refresh forever.
+      expect(backend.logoutCalls, 0);
     }
 
     test('the refresh token is rejected', () async {
@@ -390,14 +407,15 @@ void main() {
   test('signing out during a refresh is not undone', () async {
     final c = await started();
     backend.expireAccessToken();
+    Future<void>? signingOut;
     backend.duringRefresh = () =>
-        c.read(authControllerProvider.notifier).signOut();
+        signingOut ??= c.read(authControllerProvider.notifier).signOut();
 
-    await expectLater(
-      c.read(dioProvider).get<void>(_fridges),
-      throwsA(hasStatus(401)),
-    );
+    await c.read(dioProvider).get<void>(_fridges);
+    await signingOut;
 
+    // The logout waited for the refresh, so it ended the refreshed session.
+    expect(backend.logoutCalls, 1);
     expectSignedOut(c);
   });
 

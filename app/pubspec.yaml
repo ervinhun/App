@@ -53,6 +53,10 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   google_sign_in: ^7.2.0
+  retrofit: ^4.10.0
+  flutter_svg: ^2.3.2
+  shared_preferences: ^2.5.6
+  lucide_icons_flutter: ^4.0.2
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +72,8 @@ dev_dependencies:
   json_serializable: ^6.15.2
   build_runner: ^2.16.2
   drift_dev: ^2.35.1
+  swagger_parser: ^1.45.1
+  retrofit_generator: ^10.3.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -79,6 +85,22 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  # Variable fonts from Google Fonts (OFL, licences next to the files). Weights
+  # are applied through AppText, which also sets the matching `wght` axis.
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Variable.ttf
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree-Variable.ttf
+    - family: Bricolage Grotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
-import 'package:app/features/auth/data/auth_api.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,20 +11,21 @@ import '../fakes.dart';
 
 void main() {
   late FakeTokenStorage tokens;
-  late FakeAuthApi api;
+  late FakeAuthClient api;
   late FakeGoogleAuth google;
 
   ProviderContainer container() => ProviderContainer.test(
     overrides: [
       tokenStorageProvider.overrideWithValue(tokens),
-      authApiProvider.overrideWithValue(api),
+      authClientProvider.overrideWithValue(api),
+      signInClientProvider.overrideWithValue(api),
       googleAuthProvider.overrideWithValue(google),
     ],
   );
 
   setUp(() {
     tokens = FakeTokenStorage();
-    api = FakeAuthApi();
+    api = FakeAuthClient();
     google = FakeGoogleAuth();
   });
 
@@ -59,11 +59,11 @@ void main() {
           .signInWithGoogle();
 
       expect(signedIn, isTrue);
-      expect(api.externalCalls.single, (
-        provider: 'google',
-        idToken: 'google-id-token',
-        name: 'Anna G',
-      ));
+      final call = api.externalCalls.single;
+      expect(
+        (call.provider, call.idToken, call.displayName, call.platform),
+        ('google', 'google-id-token', 'Anna G', 'android'),
+      );
       expect(tokens.token, 'backend-jwt');
       expect(tokens.refreshToken, 'backend-refresh');
       expect(c.read(authControllerProvider).value, anna);
@@ -97,18 +97,37 @@ void main() {
     });
   });
 
-  test('sign out clears the token and the Google account', () async {
-    tokens.token = 'jwt';
-    tokens.refreshToken = 'refresh';
-    final c = container();
-    await c.read(authControllerProvider.future);
+  group('sign out', () {
+    test(
+      'ends the backend session, clears the tokens and the Google account',
+      () async {
+        tokens
+          ..token = 'jwt'
+          ..refreshToken = 'refresh';
+        final c = container();
+        await c.read(authControllerProvider.future);
 
-    await c.read(authControllerProvider.notifier).signOut();
+        await c.read(authControllerProvider.notifier).signOut();
 
-    expect(tokens.token, isNull);
-    expect(tokens.refreshToken, isNull);
-    expect(google.signedOut, isTrue);
-    expect(c.read(authControllerProvider).value, isNull);
+        expect(api.logoutCalls, 1);
+        expect(tokens.token, isNull);
+        expect(tokens.refreshToken, isNull);
+        expect(google.signedOut, isTrue);
+        expect(c.read(authControllerProvider).value, isNull);
+      },
+    );
+
+    test('still signs out locally when the backend is unreachable', () async {
+      tokens.token = 'jwt';
+      api.logoutError = ApiException("Can't reach the server.");
+      final c = container();
+      await c.read(authControllerProvider.future);
+
+      await c.read(authControllerProvider.notifier).signOut();
+
+      expect(tokens.token, isNull);
+      expect(c.read(authControllerProvider).value, isNull);
+    });
   });
 
   group('signing out during the startup check', () {
@@ -119,7 +138,8 @@ void main() {
         retry: (_, _) => null,
         overrides: [
           tokenStorageProvider.overrideWithValue(tokens),
-          authApiProvider.overrideWithValue(api),
+          authClientProvider.overrideWithValue(api),
+          signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(google),
         ],
       );

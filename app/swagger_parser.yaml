@@ -1,0 +1,11 @@
+# Generates the backend's API client into lib/core/api/generated from its OpenAPI
+# document. After a backend change, from this folder (with the parent repo checked out):
+#   dart run swagger_parser && dart run build_runner build -d && dart format lib
+swagger_parser:
+  # Written by every backend build, see Backend/README.md.
+  schema_path: ../../Backend/openapi/FridgeFriend.json
+  output_directory: lib/core/api/generated
+  name: fridge_friend
+  json_serializer: json_serializable
+  root_client: false
+  put_clients_in_folder: true

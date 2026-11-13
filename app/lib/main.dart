@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_config.dart';
 import 'package:app/core/router/app_router.dart';
+import 'package:app/core/theme/app_theme.dart';
 
 void main() {
   ApiConfig.validate();
@@ -16,7 +17,7 @@ class FridgeFriendApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'FridgeFriend',
-      theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.teal)),
+      theme: AppTheme.light,
       routerConfig: ref.watch(routerProvider),
     );
   }

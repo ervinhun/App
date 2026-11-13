@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Keeps the backend tokens in the platform keychain / keystore.
+/// Keeps the backend's access and refresh tokens in the platform keychain / keystore.
 class TokenStorage {
   TokenStorage([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
@@ -11,8 +11,10 @@ class TokenStorage {
 
   final FlutterSecureStorage _storage;
 
+  /// The access token, sent as the Bearer token.
   Future<String?> read() => _storage.read(key: _accessTokenKey);
 
+  /// The single-use token for `POST /api/auth/refresh`.
   Future<String?> readRefreshToken() => _storage.read(key: _refreshTokenKey);
 
   Future<void> write({

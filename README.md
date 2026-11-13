@@ -15,6 +15,19 @@ cp .env.example .env # then fill in the values
 flutter run --dart-define-from-file=.env
 ```
 
+## Backend API client
+
+The client for the backend (`AuthClient`, `FridgesClient`, and their request/response models) is generated into [`app/lib/core/api/generated/`](app/lib/core/api/generated/) by [`swagger_parser`](https://pub.dev/packages/swagger_parser) from the backend's OpenAPI document. Don't edit it by hand. After a backend change to an endpoint or DTO, build the backend (that rewrites `Backend/openapi/FridgeFriend.json`), then, with the parent `FridgeFriend` repo checked out:
+
+```sh
+cd app
+dart run swagger_parser
+dart run build_runner build -d
+dart format lib
+```
+
+and commit the result. Wrap calls in `apiCall(...)` (`core/api/api_client.dart`) so failures surface as `ApiException`.
+
 ## CI/CD
 
 - **`ci.yml`** — format check, analyze, test (test running is currently disabled via `RUN_TESTS`, kept wired in for when the team starts writing them).
