@@ -260,6 +260,7 @@ class _FoodGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget card(FoodItem item) => SwipeableFoodCard(
+      key: ValueKey(item.id),
       item: item,
       today: today,
       compact: view == FoodView.grid,
