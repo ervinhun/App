@@ -88,6 +88,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/l10n/
 
   # Variable fonts from Google Fonts (OFL, licences next to the files). Weights
   # are applied through AppText, which also sets the matching `wght` axis.
