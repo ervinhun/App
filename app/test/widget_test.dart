@@ -3,6 +3,7 @@ import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
+import 'package:app/features/food/data/product_catalog_api.dart';
 import 'package:app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,7 @@ void main() {
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
           hintStorageProvider.overrideWithValue(FakeHintStorage()),
           guestStorageProvider.overrideWithValue(guests),
+          productTypesProvider.overrideWith((ref) => Stream.value(const [])),
         ],
         child: const FridgeFriendApp(),
       ),

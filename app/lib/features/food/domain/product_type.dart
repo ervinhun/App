@@ -30,6 +30,26 @@ class ProductType {
   final int? fridgeExpiryDays;
   final int? freezerExpiryDays;
 
+  factory ProductType.fromJson(Map<String, dynamic> json) => ProductType(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    category: json['category'] as String,
+    defaultExpiryDays: json['defaultExpiryDays'] as int,
+    pantryExpiryDays: json['pantryExpiryDays'] as int?,
+    fridgeExpiryDays: json['fridgeExpiryDays'] as int?,
+    freezerExpiryDays: json['freezerExpiryDays'] as int?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'category': category,
+    'defaultExpiryDays': defaultExpiryDays,
+    'pantryExpiryDays': pantryExpiryDays,
+    'fridgeExpiryDays': fridgeExpiryDays,
+    'freezerExpiryDays': freezerExpiryDays,
+  };
+
   /// How long it keeps in [storage], unopened; null when it isn't kept there.
   /// A type without per-storage times, e.g. one a user made, keeps its default
   /// anywhere.

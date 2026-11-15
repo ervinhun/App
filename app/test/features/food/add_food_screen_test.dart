@@ -89,7 +89,8 @@ void main() {
           ),
           initialFoodProvider.overrideWithValue(const []),
           productTypesProvider.overrideWith(
-            (ref) => loadTypes?.call() ?? Future.value(types),
+            (ref) =>
+                Stream.fromFuture(loadTypes?.call() ?? Future.value(types)),
           ),
         ],
         child: MaterialApp.router(routerConfig: router),
