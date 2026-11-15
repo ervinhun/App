@@ -5,9 +5,14 @@ import 'package:app/core/api/api_client.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
+///
+/// Offline, a stored session counts as signed in, as the user it was for: the
+/// app works offline, and the backend checks the token again on the next
+/// request that reaches it.
 ///
 /// Sign-in methods throw [ApiException] (or a Google SDK error) on failure and
 /// leave the state unchanged, so screens can show the error themselves.
@@ -23,12 +28,17 @@ class AuthController extends AsyncNotifier<UserDto?> {
   Future<UserDto?> build() async {
     if (await _tokens.read() == null) return null;
     try {
-      return await apiCall(_api.me());
+      final user = await apiCall(_api.me());
+      await _tokens.writeUser(user);
+      return user;
     } on ApiException catch (e) {
       // The session ended, or the account was deleted.
       if (e.isUnauthorized) {
         await _tokens.clear();
         return null;
+      }
+      if (e.isOffline) {
+        if (await _tokens.readUser() case final user?) return user;
       }
       rethrow;
     }
@@ -112,6 +122,8 @@ class AuthController extends AsyncNotifier<UserDto?> {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
     );
+    await _tokens.writeUser(session.user);
+    await ref.read(guestModeProvider.notifier).leave();
     state = AsyncData(session.user);
   }
 }

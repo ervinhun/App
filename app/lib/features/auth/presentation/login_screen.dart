@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_client.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 
-/// Email/password sign-in and registration, plus "Continue with Google".
+/// Email/password sign-in and registration, plus "Continue with Google" and
+/// "Continue as guest".
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -184,6 +186,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         label: const Text('Continue with Google'),
                       ),
                     ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () => ref.read(guestModeProvider.notifier).enter(),
+                      child: const Text('Continue as guest'),
+                    ),
                   ],
                 ),
               ),

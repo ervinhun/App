@@ -6,11 +6,13 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/router/app_router.dart';
+import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/dashboard/presentation/widgets/dashboard_header.dart';
 import 'package:app/features/dashboard/presentation/widgets/food_filters.dart';
+import 'package:app/features/dashboard/presentation/widgets/offline_banner.dart';
 import 'package:app/features/dashboard/presentation/widgets/swipe_hint_banner.dart';
 import 'package:app/features/dashboard/presentation/widgets/swipeable_food_card.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
@@ -101,6 +103,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(authControllerProvider).value;
     final showSwipeHint = ref.watch(swipeHintProvider).value ?? false;
     final firstName = user?.displayName.trim().split(' ').first ?? '';
+    ref.listen(syncControllerProvider, (previous, next) {
+      if (next.rejected > (previous?.rejected ?? 0)) {
+        _showSnackBar(
+          const Text(
+            "Some changes couldn't be saved: someone else removed that food, "
+            'or you can no longer change this fridge.',
+          ),
+        );
+      }
+    });
 
     final inStorage = [
       for (final item in items)
@@ -145,6 +157,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(22, 10, 22, 20),
               children: [
+                const OfflineBanner(),
                 DashboardHeader(
                   fridgeName: 'Home',
                   userName: firstName.isEmpty ? 'there' : firstName,

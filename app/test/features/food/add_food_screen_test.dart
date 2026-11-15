@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/db/test_database.dart';
 import '../../core/storage/fake_hint_storage.dart';
 import '../auth/fakes.dart';
 
@@ -79,6 +80,7 @@ void main() {
         // A failed load would otherwise be retried on a timer.
         retry: (_, _) => null,
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(FakeTokenStorage('jwt')),
           authClientProvider.overrideWithValue(FakeAuthClient()),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
