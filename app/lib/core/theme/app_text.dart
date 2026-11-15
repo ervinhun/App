@@ -19,17 +19,17 @@ abstract final class AppText {
     height: height,
   );
 
-  /// The FridgeFriend wordmark.
-  static TextStyle brand(Color color) => TextStyle(
+  /// The FridgeFriend wordmark: 18.3 in the header, 32 on the login screen.
+  static TextStyle brand(Color color, {double size = 18.333}) => TextStyle(
     fontFamily: 'Bricolage Grotesque',
-    fontSize: 18.333,
+    fontSize: size,
     fontWeight: FontWeight.w800,
     fontVariations: const [
       FontVariation.weight(800),
       FontVariation('opsz', 14),
       FontVariation('wdth', 100),
     ],
-    letterSpacing: -0.55,
+    letterSpacing: -0.03 * size,
     color: color,
   );
 

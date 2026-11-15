@@ -50,7 +50,7 @@ void main() {
   testWidgets('signed out: shows the login screen', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Continue with email'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
   }, variant: android);
 
@@ -126,6 +126,8 @@ void main() {
       statusCode: 401,
     );
     await pumpApp(tester);
+    await tester.tap(find.text('Continue with email'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byType(TextFormField).at(0),
