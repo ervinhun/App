@@ -7,6 +7,7 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/dashboard/presentation/widgets/food_card.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// A [FoodCard] that can be swiped right to mark it opened, or left to
 /// remove it.
@@ -177,9 +178,11 @@ class _SwipeableFoodCardState extends State<SwipeableFoodCard>
           child: Semantics(
             customSemanticsActions: {
               if (canOpen)
-                const CustomSemanticsAction(label: 'Mark opened'):
-                    widget.onOpened,
-              const CustomSemanticsAction(label: 'Remove'): widget.onRemoved,
+                CustomSemanticsAction(
+                  label: context.l10n.tr('food.markOpened'),
+                ): widget.onOpened,
+              CustomSemanticsAction(label: context.l10n.tr('food.remove')):
+                  widget.onRemoved,
             },
             child: AnimatedBuilder(
               animation: _peekOffset,
@@ -213,13 +216,13 @@ class _SwipeBackground extends StatelessWidget {
   const _SwipeBackground.open({required this.armed, this.showLabel = false})
     : color = AppColors.brandAccent,
       icon = LucideIcons.lockOpen,
-      label = 'Mark opened',
+      labelKey = 'food.markOpened',
       alignment = Alignment.centerLeft;
 
   const _SwipeBackground.remove({required this.armed, this.showLabel = false})
     : color = AppColors.statusSoon,
       icon = LucideIcons.trash,
-      label = 'Remove',
+      labelKey = 'food.remove',
       alignment = Alignment.centerRight;
 
   final bool armed;
@@ -229,7 +232,7 @@ class _SwipeBackground extends StatelessWidget {
   final bool showLabel;
   final Color color;
   final IconData icon;
-  final String label;
+  final String labelKey;
   final Alignment alignment;
 
   @override
@@ -241,7 +244,7 @@ class _SwipeBackground extends StatelessWidget {
     );
     final text = Flexible(
       child: Text(
-        label,
+        context.l10n.tr(labelKey),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: AppText.nunito(13, FontWeight.w800, AppColors.surface),

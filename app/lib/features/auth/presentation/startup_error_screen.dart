@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_client.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// Shown when the stored tokens couldn't be checked on startup, such as when
 /// offline. The user may still be signed in, so this doesn't ask them to sign in.
@@ -26,13 +27,13 @@ class StartupErrorScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'FridgeFriend',
+                    context.l10n.tr('app.title'),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 32),
                   Text(
-                    ApiException.messageFor(auth.error),
+                    ApiException.messageFor(auth.error, context.l10n),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -42,12 +43,12 @@ class StartupErrorScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: () => ref.invalidate(authControllerProvider),
-                    child: const Text('Try again'),
+                    child: Text(context.l10n.tr('common.tryAgain')),
                   ),
                   TextButton(
                     onPressed: () =>
                         ref.read(authControllerProvider.notifier).signOut(),
-                    child: const Text('Sign out'),
+                    child: Text(context.l10n.tr('auth.signOut')),
                   ),
                 ],
               ),

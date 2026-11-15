@@ -5,6 +5,7 @@ import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:app/features/food/data/sample_food.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,7 +87,10 @@ void main() {
             hints ?? FakeHintStorage(swipeDone: true),
           ),
         ],
-        child: const MaterialApp(home: DashboardScreen()),
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: DashboardScreen(),
+        ),
       ),
     );
     if (settle) await tester.pumpAndSettle();

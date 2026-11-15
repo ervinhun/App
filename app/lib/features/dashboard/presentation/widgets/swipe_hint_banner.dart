@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// Whether to teach the swipe gestures: true until the user first swipes a
 /// card or closes the tip.
@@ -47,23 +48,21 @@ class SwipeHintBanner extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(
-                  text: 'Tip: ',
+                  text: '${context.l10n.tr('dashboard.swipeHint.title')} ',
                   style: AppText.nunito(
                     12,
                     FontWeight.w800,
                     AppColors.textPrimary,
                   ),
                 ),
-                const TextSpan(
-                  text: 'swipe a card → to mark it opened, or ← to remove it.',
-                ),
+                TextSpan(text: context.l10n.tr('dashboard.swipeHint.body')),
               ],
             ),
             style: AppText.nunito(12, FontWeight.w600, AppColors.brandPrimary),
           ),
         ),
         IconButton(
-          tooltip: 'Close tip',
+          tooltip: context.l10n.tr('dashboard.swipeHint.close'),
           onPressed: onClose,
           visualDensity: VisualDensity.compact,
           icon: const Icon(

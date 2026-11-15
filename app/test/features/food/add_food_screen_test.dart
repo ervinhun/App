@@ -9,6 +9,7 @@ import 'package:app/features/food/data/sample_food.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/domain/product_type.dart';
 import 'package:app/features/food/presentation/add_food_screen.dart';
+import 'package:app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -90,7 +91,10 @@ void main() {
             (ref) => loadTypes?.call() ?? Future.value(types),
           ),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pumpAndSettle();

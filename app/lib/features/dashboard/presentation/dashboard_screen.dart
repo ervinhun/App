@@ -15,6 +15,7 @@ import 'package:app/features/dashboard/presentation/widgets/swipe_hint_banner.da
 import 'package:app/features/dashboard/presentation/widgets/swipeable_food_card.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// The "My food" tab: what's in the current fridge, soonest to expire first.
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -36,8 +37,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   FoodItemsController get _food => ref.read(foodItemsProvider.notifier);
 
   // Until these features exist, their buttons say so instead of doing nothing.
-  void _notYet(String feature) =>
-      _showSnackBar(Text('$feature is coming soon.'));
+  void _notYet(String featureKey) => _showSnackBar(
+    Text(
+      context.l10n.tr(
+        'dashboard.comingSoon',
+        args: {'feature': context.l10n.tr(featureKey)},
+      ),
+    ),
+  );
 
   /// The Dashboard's own messenger, so messages show above the sticky add
   /// buttons rather than over them.
@@ -58,7 +65,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _showUndo(String message, VoidCallback undo) => _showSnackBar(
     Text(message),
-    action: SnackBarAction(label: 'Undo', onPressed: undo),
+    action: SnackBarAction(
+      label: context.l10n.tr('common.undo'),
+      onPressed: undo,
+    ),
   );
 
   void _markOpened(FoodItem item, DateTime today) {
@@ -68,7 +78,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         .firstWhere((i) => i.id == item.id)
         .expiresOn;
     _showUndo(
-      '${item.name} opened · eat by ${DateFormat('d MMM').format(eatBy)}',
+      context.l10n.tr(
+        'dashboard.openedUndo',
+        args: {'name': item.name, 'date': DateFormat('d MMM').format(eatBy)},
+      ),
       () => _food.replace(before),
     );
   }
@@ -86,12 +99,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _storage = item.storage;
       _filter = FoodFilter.all;
     });
-    _showUndo('${item.name} added', () => _food.remove(item.id));
+    _showUndo(
+      context.l10n.tr('dashboard.addedUndo', args: {'name': item.name}),
+      () => _food.remove(item.id),
+    );
   }
 
   void _remove(FoodItem item) {
     final (removed, index) = _food.remove(item.id);
-    _showUndo('${item.name} removed', () => _food.restore(removed, index));
+    _showUndo(
+      context.l10n.tr('dashboard.removedUndo', args: {'name': item.name}),
+      () => _food.restore(removed, index),
+    );
   }
 
   @override
@@ -101,6 +120,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(authControllerProvider).value;
     final showSwipeHint = ref.watch(swipeHintProvider).value ?? false;
     final firstName = user?.displayName.trim().split(' ').first ?? '';
+    final l10n = context.l10n;
 
     final inStorage = [
       for (final item in items)
@@ -135,7 +155,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         backgroundColor: AppColors.canvas,
         // Always in reach, while the list scrolls behind.
         bottomNavigationBar: _AddFoodButtons(
-          onScan: () => _notYet('Scanning'),
+          onScan: () => _notYet('dashboard.feature.scanning'),
           onAddManual: _addManually,
         ),
         body: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -147,11 +167,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 DashboardHeader(
                   fridgeName: 'Home',
-                  userName: firstName.isEmpty ? 'there' : firstName,
+                  userName: firstName.isEmpty
+                      ? l10n.tr('dashboard.userNameFallback')
+                      : firstName,
                   today: today,
                   hasUnread: true,
-                  onSwitchFridge: () => _notYet('Switching fridges'),
-                  onNotifications: () => _notYet('Notifications'),
+                  onSwitchFridge: () =>
+                      _notYet('dashboard.feature.switchingFridges'),
+                  onNotifications: () =>
+                      _notYet('dashboard.feature.notifications'),
                 ),
                 const SizedBox(height: 18),
                 FoodSearchField(
@@ -169,7 +193,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   view: _view,
                   onSelected: (filter) => setState(() => _filter = filter),
                   onViewChanged: (view) => setState(() => _view = view),
-                  onMoreFilters: () => _notYet('More filters'),
+                  onMoreFilters: () => _notYet('dashboard.feature.moreFilters'),
                 ),
                 const SizedBox(height: 18),
                 StorageTabs(
@@ -184,7 +208,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'First dibs',
+                  l10n.tr('dashboard.firstDibs'),
                   style: AppText.nunito(
                     20,
                     FontWeight.w800,
@@ -202,9 +226,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      inStorage.isEmpty
-                          ? 'Nothing in here yet.'
-                          : 'No food matches.',
+                      l10n.tr(
+                        inStorage.isEmpty
+                            ? 'dashboard.emptyStorage'
+                            : 'dashboard.noMatches',
+                      ),
                       textAlign: TextAlign.center,
                       style: AppText.nunito(
                         14,
@@ -325,7 +351,7 @@ class _AddFoodButtons extends StatelessWidget {
       children: [
         Expanded(
           child: _AddButton(
-            label: 'Scan',
+            label: context.l10n.tr('dashboard.scan'),
             icon: LucideIcons.scanBarcode,
             filled: true,
             onTap: onScan,
@@ -333,7 +359,7 @@ class _AddFoodButtons extends StatelessWidget {
         ),
         Expanded(
           child: _AddButton(
-            label: 'Add manual',
+            label: context.l10n.tr('dashboard.addManual'),
             icon: LucideIcons.plus,
             filled: false,
             onTap: onAddManual,

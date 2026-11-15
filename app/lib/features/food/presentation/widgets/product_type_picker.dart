@@ -10,6 +10,7 @@ import 'package:app/features/food/data/product_catalog_api.dart';
 import 'package:app/features/food/domain/food_icons.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/domain/product_type.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// Asks which product type something is, from the backend's catalogue: first
 /// the category, then a type in it. Only lists types that are kept in
@@ -126,8 +127,10 @@ class _ProductTypePickerState extends ConsumerState<_ProductTypePicker> {
             ],
             Text(
               category == null
-                  ? 'What is it?'
-                  : (category.isEmpty ? 'Other' : category),
+                  ? context.l10n.tr('typePicker.title')
+                  : (category.isEmpty
+                        ? context.l10n.tr('typePicker.otherCategory')
+                        : category),
               style: AppText.nunito(
                 22,
                 FontWeight.w900,
@@ -136,15 +139,20 @@ class _ProductTypePickerState extends ConsumerState<_ProductTypePicker> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Food that keeps in the ${widget.storage.name}',
+              context.l10n.tr('typePicker.keepsIn.${widget.storage.name}'),
               style: AppText.nunito(12, FontWeight.w400, AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
             _SearchField(
               controller: _search,
-              hint: category == null
-                  ? 'Search all types'
-                  : 'Search ${category.isEmpty ? 'other' : category}',
+              hint: switch (category) {
+                null => context.l10n.tr('typePicker.searchAll'),
+                '' => context.l10n.tr('typePicker.searchOther'),
+                _ => context.l10n.tr(
+                  'typePicker.searchCategory',
+                  args: {'category': category},
+                ),
+              },
               onChanged: (value) => setState(() => _query = value),
             ),
             const SizedBox(height: 12),
@@ -152,7 +160,7 @@ class _ProductTypePickerState extends ConsumerState<_ProductTypePicker> {
               child: switch (types) {
                 AsyncData(:final value) => _buildList(value),
                 AsyncError(:final error) => _LoadError(
-                  message: ApiException.messageFor(error),
+                  message: ApiException.messageFor(error, context.l10n),
                   onRetry: () => ref.invalidate(productTypesProvider),
                 ),
                 _ => const Center(child: CircularProgressIndicator()),
@@ -219,7 +227,7 @@ class _BackToCategories extends StatelessWidget {
               color: AppColors.brandPrimary,
             ),
             Text(
-              'All categories',
+              context.l10n.tr('typePicker.allCategories'),
               style: AppText.nunito(
                 12,
                 FontWeight.w800,
@@ -265,7 +273,9 @@ class _CategoryList extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      category.isEmpty ? 'Other' : category,
+                      category.isEmpty
+                          ? context.l10n.tr('typePicker.otherCategory')
+                          : category,
                       style: AppText.nunito(
                         13,
                         FontWeight.w800,
@@ -274,7 +284,7 @@ class _CategoryList extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    count == 1 ? '1 type' : '$count types',
+                    context.l10n.plural('typePicker.typeCount', count),
                     style: AppText.nunito(
                       11,
                       FontWeight.w400,
@@ -370,7 +380,7 @@ class _TypeList extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(top: 24),
         child: Text(
-          'No types match.',
+          context.l10n.tr('typePicker.noMatches'),
           textAlign: TextAlign.center,
           style: AppText.nunito(14, FontWeight.w600, AppColors.textSecondary),
         ),
@@ -385,7 +395,9 @@ class _TypeList extends StatelessWidget {
           Padding(
             padding: EdgeInsets.only(top: rows.isEmpty ? 0 : 16, bottom: 4),
             child: Text(
-              category.isEmpty ? 'Other' : category,
+              category.isEmpty
+                  ? context.l10n.tr('typePicker.otherCategory')
+                  : category,
               style: AppText.nunito(11, FontWeight.w800, AppColors.textPrimary),
             ),
           ),
@@ -429,7 +441,7 @@ class _TypeRow extends StatelessWidget {
             ),
           ),
           Text(
-            '$days d',
+            context.l10n.tr('typePicker.daysShort', args: {'days': days}),
             style: AppText.nunito(11, FontWeight.w400, AppColors.textSecondary),
           ),
         ],
@@ -454,7 +466,10 @@ class _LoadError extends StatelessWidget {
         textAlign: TextAlign.center,
         style: AppText.nunito(14, FontWeight.w600, AppColors.textPrimary),
       ),
-      TextButton(onPressed: onRetry, child: const Text('Try again')),
+      TextButton(
+        onPressed: onRetry,
+        child: Text(context.l10n.tr('common.tryAgain')),
+      ),
     ],
   );
 }

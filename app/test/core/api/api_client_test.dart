@@ -324,10 +324,11 @@ void main() {
       await expectLater(
         container(retry: (_, _) => null).read(authControllerProvider.future),
         throwsA(
+          // A status code means the backend answered: not the offline error.
           isA<ApiException>().having(
-            (e) => e.message,
-            'message',
-            isNot(contains("Can't reach the server")),
+            (e) => e.statusCode,
+            'statusCode',
+            isNotNull,
           ),
         ),
       );

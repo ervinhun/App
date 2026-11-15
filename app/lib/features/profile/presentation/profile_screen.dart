@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// Placeholder "You" tab until the profile screen is designed.
 class ProfileScreen extends ConsumerWidget {
@@ -12,17 +13,24 @@ class ProfileScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).value;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('You'),
+        title: Text(context.l10n.tr('profile.title')),
         actions: [
           IconButton(
-            tooltip: 'Sign out',
+            tooltip: context.l10n.tr('auth.signOut'),
             icon: const Icon(Icons.logout),
             onPressed: () =>
                 ref.read(authControllerProvider.notifier).signOut(),
           ),
         ],
       ),
-      body: Center(child: Text('Signed in as ${user?.displayName ?? ''}')),
+      body: Center(
+        child: Text(
+          context.l10n.tr(
+            'profile.signedInAs',
+            args: {'name': user?.displayName ?? ''},
+          ),
+        ),
+      ),
     );
   }
 }

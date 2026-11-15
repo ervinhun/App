@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// The logo, fridge switcher and notifications, then the greeting and title.
 class DashboardHeader extends StatelessWidget {
@@ -27,8 +28,10 @@ class DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final greeting =
-        '${DateFormat('EEE, d MMM').format(today)} · Hello, $userName!';
+    final greeting = context.l10n.tr(
+      'dashboard.greeting',
+      args: {'date': DateFormat('EEE, d MMM').format(today), 'name': userName},
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -141,7 +144,11 @@ class _NotificationsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    label: hasUnread ? 'Notifications, unread' : 'Notifications',
+    label: context.l10n.tr(
+      hasUnread
+          ? 'dashboard.notificationsUnread'
+          : 'dashboard.feature.notifications',
+    ),
     child: _OutlinedPill(
       onTap: onTap,
       child: SizedBox.square(

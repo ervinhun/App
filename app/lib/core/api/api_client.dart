@@ -6,6 +6,7 @@ import 'package:app/core/api/auth_interceptor.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 Dio _backendDio() => Dio(
   BaseOptions(
@@ -54,9 +55,13 @@ Future<T> apiCall<T>(Future<T> request) async {
 
 /// A failed backend call, with a message that is safe to show to the user.
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode});
+  ApiException(String this.message, {this.statusCode});
 
-  final String message;
+  /// For failures the backend didn't explain: no connection, or a bare status.
+  ApiException._unexplained({this.statusCode}) : message = null;
+
+  /// The backend's own explanation, if it gave one.
+  final String? message;
   final int? statusCode;
 
   bool get isUnauthorized => statusCode == 401;
@@ -79,20 +84,20 @@ class ApiException implements Exception {
         return ApiException(message, statusCode: status);
       }
     }
-    if (status == null) {
-      return ApiException(
-        "Can't reach the server. Check your connection and try again.",
-      );
-    }
-    return ApiException('Something went wrong ($status).', statusCode: status);
+    return ApiException._unexplained(statusCode: status);
   }
 
   /// What to tell the user about [error]. Only an [ApiException] has a message
   /// that is safe to show.
-  static String messageFor(Object? error) => error is ApiException
-      ? error.message
-      : 'Something went wrong. Please try again.';
+  static String messageFor(Object? error, AppLocalizations l10n) {
+    if (error is! ApiException) return l10n.tr('errors.generic');
+    if (error.message case final message?) return message;
+    if (error.statusCode case final status?) {
+      return l10n.tr('errors.status', args: {'status': status});
+    }
+    return l10n.tr('errors.offline');
+  }
 
   @override
-  String toString() => message;
+  String toString() => message ?? 'ApiException($statusCode)';
 }

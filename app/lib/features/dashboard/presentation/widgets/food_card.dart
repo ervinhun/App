@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 final _shortDate = DateFormat('d MMM');
 
@@ -152,8 +153,11 @@ class _Details extends StatelessWidget {
           [
             if (item.amount.isNotEmpty) item.amount,
             openedOn == null
-                ? 'Unopened'
-                : 'Opened ${_shortDate.format(openedOn)}',
+                ? context.l10n.tr('food.unopened')
+                : context.l10n.tr(
+                    'food.openedOn',
+                    args: {'date': _shortDate.format(openedOn)},
+                  ),
           ].join(' · '),
           style: AppText.nunito(12, FontWeight.w500, AppColors.brandPrimary),
         ),
@@ -217,10 +221,9 @@ class _ExpiryIndicator extends StatelessWidget {
       children: [
         Text(
           switch (days) {
-            < 0 => 'Expired',
-            0 => 'Today',
-            1 => '1 day',
-            _ => '$days days',
+            < 0 => context.l10n.tr('food.expired'),
+            0 => context.l10n.tr('food.today'),
+            _ => context.l10n.plural('food.daysLeft', days),
           },
           maxLines: 1,
           style: AppText.nunito(16, FontWeight.w800, color),

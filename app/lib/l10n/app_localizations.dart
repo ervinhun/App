@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart';
 
 /// Translated UI strings, loaded from `assets/l10n/<languageCode>.json`.
 ///
@@ -11,6 +13,8 @@ import 'package:flutter/widgets.dart';
 ///
 /// Keys are dot-separated paths into the (nested) JSON, e.g. `home.title`.
 /// Values may contain `{name}` placeholders filled in via [tr]'s `args`.
+/// Text that depends on a number is an object of plural forms, read with
+/// [plural]: `{"one": "{count} day", "other": "{count} days"}`.
 ///
 /// To add a language: create `assets/l10n/<code>.json` and add its [Locale]
 /// to [supportedLocales].
@@ -23,6 +27,15 @@ class AppLocalizations {
 
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
+
+  /// Our strings plus Flutter's own (date pickers, back buttons, ...), for
+  /// `MaterialApp.localizationsDelegates`.
+  static const localizationsDelegates = <LocalizationsDelegate<Object>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
 
   final Locale locale;
   final Map<String, String> _strings;
@@ -51,6 +64,8 @@ class AppLocalizations {
     if (strings == null || fallback == null) {
       return preload().then((_) => load(locale));
     }
+    // So DateFormat and NumberFormat follow the app's language.
+    Intl.defaultLocale = locale.toLanguageTag();
     return SynchronousFuture(AppLocalizations(locale, strings, fallback));
   }
 
@@ -96,6 +111,30 @@ class AppLocalizations {
       value = value.replaceAll('{$name}', '$arg');
     }
     return value;
+  }
+
+  /// Returns the plural form of [key] that suits [count] in this language:
+  /// `key.one`, `key.other` and, where the language has them, `key.zero`,
+  /// `key.two`, `key.few` or `key.many`. `{count}` is filled in with [count].
+  String plural(String key, num count, {Map<String, Object> args = const {}}) {
+    String? form(String name) {
+      final formKey = '$key.$name';
+      final exists =
+          _strings.containsKey(formKey) || _fallback.containsKey(formKey);
+      return exists ? formKey : null;
+    }
+
+    final formKey = Intl.pluralLogic(
+      count,
+      locale: locale.toLanguageTag(),
+      zero: form('zero'),
+      one: form('one'),
+      two: form('two'),
+      few: form('few'),
+      many: form('many'),
+      other: '$key.other',
+    );
+    return tr(formKey, args: {'count': count, ...args});
   }
 }
 

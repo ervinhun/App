@@ -4,19 +4,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/l10n/app_localizations.dart';
 
-/// The chips under the search field.
+/// The chips under the search field, labelled by `dashboard.filter.<name>`.
 enum FoodFilter {
-  all('All'),
-  expiring('Expiring'),
-  dairy('Dairy'),
-  veg('Veg'),
-  meat('Meat'),
-  fish('Fish');
-
-  const FoodFilter(this.label);
-
-  final String label;
+  all,
+  expiring,
+  dairy,
+  veg,
+  meat,
+  fish;
 
   bool matches(FoodItem item, DateTime today) => switch (this) {
     all => true,
@@ -60,7 +57,7 @@ class FoodSearchField extends StatelessWidget {
           cursorColor: AppColors.brandAccent,
           style: AppText.nunito(13, FontWeight.w500, AppColors.textPrimary),
           decoration: InputDecoration(
-            hintText: 'Search food',
+            hintText: context.l10n.tr('dashboard.searchFood'),
             hintStyle: AppText.nunito(
               13,
               FontWeight.w500,
@@ -121,7 +118,7 @@ class FoodFilterBar extends StatelessWidget {
             spacing: 8,
             children: [
               _RoundButton(
-                tooltip: 'More filters',
+                tooltip: context.l10n.tr('dashboard.feature.moreFilters'),
                 onTap: onMoreFilters,
                 child: const Icon(
                   LucideIcons.slidersHorizontal,
@@ -132,7 +129,7 @@ class FoodFilterBar extends StatelessWidget {
               for (final filter in FoodFilter.values)
                 _Chip(
                   label: [
-                    filter.label,
+                    context.l10n.tr('dashboard.filter.${filter.name}'),
                     if (counts[filter] case final count?) '$count',
                   ].join(' '),
                   selected: filter == selected,
@@ -226,11 +223,11 @@ class _ViewToggle extends StatelessWidget {
       spacing: 4,
       children: [
         for (final (option, icon, tooltip) in [
-          (FoodView.grid, LucideIcons.layoutGrid, 'Grid view'),
-          (FoodView.list, LucideIcons.list, 'List view'),
+          (FoodView.grid, LucideIcons.layoutGrid, 'dashboard.gridView'),
+          (FoodView.list, LucideIcons.list, 'dashboard.listView'),
         ])
           Tooltip(
-            message: tooltip,
+            message: context.l10n.tr(tooltip),
             child: Semantics(
               selected: option == view,
               child: Material(
@@ -280,15 +277,15 @@ class StorageTabs extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     spacing: 6,
     children: [
-      for (final (location, icon, label) in [
-        (StorageLocation.fridge, LucideIcons.refrigerator, 'Fridge'),
-        (StorageLocation.freezer, LucideIcons.snowflake, 'Freezer'),
-        (StorageLocation.pantry, LucideIcons.archive, 'Pantry'),
+      for (final (location, icon) in [
+        (StorageLocation.fridge, LucideIcons.refrigerator),
+        (StorageLocation.freezer, LucideIcons.snowflake),
+        (StorageLocation.pantry, LucideIcons.archive),
       ])
         Expanded(
           child: _StorageTab(
             icon: icon,
-            label: label,
+            label: context.l10n.tr('storage.${location.name}'),
             count: counts[location] ?? 0,
             active: location == selected,
             onTap: () => onSelected(location),

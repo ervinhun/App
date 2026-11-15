@@ -11,6 +11,7 @@ import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/domain/product_type.dart';
 import 'package:app/features/food/presentation/widgets/product_type_picker.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// "Add manual": type in something that wasn't scanned.
 ///
@@ -97,9 +98,10 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
       if (_name.text == type.name) _name.clear();
       if (!_datePicked) _bestBefore = null;
       _type = null;
-      _typeNote =
-          "${type.name} isn't usually kept in the ${storage.name}. "
-          'Choose what it is again.';
+      _typeNote = context.l10n.tr(
+        'addFood.typeNotKeptIn.${storage.name}',
+        args: {'type': type.name},
+      );
     });
   }
 
@@ -110,7 +112,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
       initialDate: _bestBefore ?? today,
       firstDate: _daysFromToday(-30),
       lastDate: _daysFromToday(365 * 5),
-      helpText: 'Best before',
+      helpText: context.l10n.tr('addFood.bestBefore'),
     );
     if (date == null) return;
     setState(() {
@@ -144,6 +146,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
   @override
   Widget build(BuildContext context) {
     final bestBefore = _bestBefore;
+    final l10n = context.l10n;
     return Scaffold(
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
@@ -156,7 +159,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
                 _BackLink(onTap: () => context.pop()),
                 const SizedBox(height: 7),
                 Text(
-                  'Add food by hand.',
+                  l10n.tr('addFood.title'),
                   style: AppText.nunito(
                     32,
                     FontWeight.w900,
@@ -166,7 +169,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  "Pick what it is and we'll suggest when it needs eating.",
+                  l10n.tr('addFood.subtitle'),
                   style: AppText.nunito(
                     13,
                     FontWeight.w400,
@@ -178,39 +181,41 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
                 _FormCard(
                   children: [
                     _Field(
-                      label: 'Where does it go?',
+                      label: l10n.tr('addFood.whereDoesItGo'),
                       child: _StorageChoices(
                         selected: _storage,
                         onSelected: _changeStorage,
                       ),
                     ),
                     _Field(
-                      label: 'What is it?',
-                      error: _showTypeError ? 'Choose what it is.' : null,
+                      label: l10n.tr('addFood.whatIsIt'),
+                      error: _showTypeError
+                          ? l10n.tr('addFood.typeRequired')
+                          : null,
                       note: _typeNote,
                       child: _TypeField(type: _type, onTap: _pickType),
                     ),
                     _Field(
-                      label: 'Name',
+                      label: l10n.tr('addFood.name'),
                       child: _TextInput(
                         controller: _name,
-                        hint: 'e.g. Greek yoghurt',
+                        hint: l10n.tr('addFood.nameHint'),
                         textCapitalization: TextCapitalization.sentences,
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                            ? 'Give it a name.'
+                            ? l10n.tr('addFood.nameRequired')
                             : null,
                       ),
                     ),
                     _Field(
-                      label: 'Amount (optional)',
+                      label: l10n.tr('addFood.amount'),
                       child: _TextInput(
                         controller: _amount,
-                        hint: 'e.g. 500 g',
+                        hint: l10n.tr('addFood.amountHint'),
                       ),
                     ),
                     _Field(
-                      label: 'Best before',
+                      label: l10n.tr('addFood.bestBefore'),
                       child: _DateField(
                         date: bestBefore,
                         suggested: bestBefore != null && !_datePicked,
@@ -218,7 +223,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
                       ),
                     ),
                     _PrimaryButton(
-                      label: 'Add to ${_storage.name}',
+                      label: l10n.tr('addFood.addTo.${_storage.name}'),
                       onPressed: _save,
                     ),
                   ],
@@ -255,7 +260,7 @@ class _BackLink extends StatelessWidget {
               color: AppColors.brandPrimary,
             ),
             Text(
-              'Back to my food',
+              context.l10n.tr('addFood.back'),
               style: AppText.nunito(
                 12,
                 FontWeight.w800,
@@ -381,7 +386,7 @@ class _TypeField extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    'Choose a type',
+                    context.l10n.tr('addFood.chooseType'),
                     style: AppText.nunito(
                       13,
                       FontWeight.w400,
@@ -493,11 +498,7 @@ class _StorageChoices extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     spacing: 8,
     children: [
-      for (final (storage, label) in [
-        (StorageLocation.fridge, 'Fridge'),
-        (StorageLocation.freezer, 'Freezer'),
-        (StorageLocation.pantry, 'Pantry'),
-      ])
+      for (final storage in StorageLocation.values)
         Expanded(
           child: Semantics(
             selected: storage == selected,
@@ -513,7 +514,7 @@ class _StorageChoices extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    label,
+                    context.l10n.tr('storage.${storage.name}'),
                     textAlign: TextAlign.center,
                     style: AppText.nunito(
                       14,
@@ -569,7 +570,7 @@ class _DateField extends StatelessWidget {
               Expanded(
                 child: date == null
                     ? Text(
-                        'Choose a type first, or pick a date',
+                        context.l10n.tr('addFood.datePlaceholder'),
                         style: AppText.nunito(
                           13,
                           FontWeight.w400,
@@ -587,7 +588,7 @@ class _DateField extends StatelessWidget {
               ),
               if (suggested)
                 Text(
-                  'suggested',
+                  context.l10n.tr('addFood.suggested'),
                   style: AppText.nunito(
                     11,
                     FontWeight.w400,

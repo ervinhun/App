@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_client.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// Email/password sign-in and registration, plus "Continue with Google".
 class LoginScreen extends ConsumerStatefulWidget {
@@ -47,7 +48,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await action();
     } catch (e) {
       if (e is! ApiException) debugPrint('Sign-in failed: $e');
-      if (mounted) setState(() => _error = ApiException.messageFor(e));
+      if (mounted) {
+        setState(() => _error = ApiException.messageFor(e, context.l10n));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -73,6 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -86,7 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'FridgeFriend',
+                      l10n.tr('app.title'),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium,
                     ),
@@ -94,28 +98,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     if (_registering) ...[
                       TextFormField(
                         controller: _displayName,
-                        decoration: const InputDecoration(labelText: 'Name'),
+                        decoration: InputDecoration(
+                          labelText: l10n.tr('login.name'),
+                        ),
                         textInputAction: TextInputAction.next,
                         validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Enter your name'
+                            ? l10n.tr('login.nameRequired')
                             : null,
                       ),
                       const SizedBox(height: 12),
                     ],
                     TextFormField(
                       controller: _email,
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      decoration: InputDecoration(
+                        labelText: l10n.tr('login.email'),
+                      ),
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
                       textInputAction: TextInputAction.next,
                       validator: (v) => (v == null || !v.contains('@'))
-                          ? 'Enter a valid email'
+                          ? l10n.tr('login.emailInvalid')
                           : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _password,
-                      decoration: const InputDecoration(labelText: 'Password'),
+                      decoration: InputDecoration(
+                        labelText: l10n.tr('login.password'),
+                      ),
                       obscureText: true,
                       autofillHints: const [AutofillHints.password],
                       textInputAction: _registering
@@ -123,20 +133,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           : TextInputAction.done,
                       onFieldSubmitted: _registering ? null : (_) => _submit(),
                       validator: (v) => (v == null || v.length < 8)
-                          ? 'At least 8 characters'
+                          ? l10n.tr('login.passwordTooShort')
                           : null,
                     ),
                     if (_registering) ...[
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _confirmPassword,
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm password',
+                        decoration: InputDecoration(
+                          labelText: l10n.tr('login.confirmPassword'),
                         ),
                         obscureText: true,
                         onFieldSubmitted: (_) => _submit(),
                         validator: (v) => v != _password.text
-                            ? "Passwords don't match"
+                            ? l10n.tr('login.passwordsDontMatch')
                             : null,
                       ),
                     ],
@@ -150,7 +160,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: _busy ? null : _submit,
-                      child: Text(_registering ? 'Create account' : 'Sign in'),
+                      child: Text(
+                        l10n.tr(
+                          _registering ? 'login.createAccount' : 'login.signIn',
+                        ),
+                      ),
                     ),
                     TextButton(
                       onPressed: _busy
@@ -160,28 +174,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               _error = null;
                             }),
                       child: Text(
-                        _registering
-                            ? 'Have an account? Sign in'
-                            : 'New here? Create an account',
+                        l10n.tr(
+                          _registering
+                              ? 'login.switchToSignIn'
+                              : 'login.switchToRegister',
+                        ),
                       ),
                     ),
                     if (LoginScreen.googleAvailable) ...[
                       const SizedBox(height: 16),
-                      const Row(
+                      Row(
                         children: [
-                          Expanded(child: Divider()),
+                          const Expanded(child: Divider()),
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('or'),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(l10n.tr('login.or')),
                           ),
-                          Expanded(child: Divider()),
+                          const Expanded(child: Divider()),
                         ],
                       ),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: _busy ? null : _google,
                         icon: const Icon(Icons.login),
-                        label: const Text('Continue with Google'),
+                        label: Text(l10n.tr('login.continueWithGoogle')),
                       ),
                     ],
                   ],

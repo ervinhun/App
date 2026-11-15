@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/l10n/app_localizations.dart';
 
 /// The signed-in app: one tab per branch of [shell], with the main navigation
 /// bar underneath.
@@ -14,9 +15,9 @@ class HomeShell extends StatelessWidget {
 
   // In branch order: see the StatefulShellRoute in app_router.dart.
   static const _destinations = [
-    (icon: LucideIcons.refrigerator, label: 'My food'),
-    (icon: LucideIcons.shoppingBasket, label: 'Management'),
-    (icon: LucideIcons.userRound, label: 'You'),
+    (icon: LucideIcons.refrigerator, label: 'nav.myFood'),
+    (icon: LucideIcons.shoppingBasket, label: 'nav.management'),
+    (icon: LucideIcons.userRound, label: 'nav.you'),
   ];
 
   @override
@@ -34,7 +35,7 @@ class HomeShell extends StatelessWidget {
               for (final (i, d) in _destinations.indexed)
                 _Destination(
                   icon: d.icon,
-                  label: d.label,
+                  label: context.l10n.tr(d.label),
                   active: i == shell.currentIndex,
                   // Tapping the current tab again goes back to its start.
                   onTap: () => shell.goBranch(

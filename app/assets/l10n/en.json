@@ -1,5 +1,145 @@
 {
   "app": {
     "title": "FridgeFriend"
+  },
+  "common": {
+    "tryAgain": "Try again",
+    "undo": "Undo"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "offline": "Can't reach the server. Check your connection and try again.",
+    "status": "Something went wrong ({status})."
+  },
+  "storage": {
+    "fridge": "Fridge",
+    "freezer": "Freezer",
+    "pantry": "Pantry"
+  },
+  "nav": {
+    "myFood": "My food",
+    "management": "Management",
+    "you": "You"
+  },
+  "auth": {
+    "signOut": "Sign out"
+  },
+  "login": {
+    "name": "Name",
+    "nameRequired": "Enter your name",
+    "email": "Email",
+    "emailInvalid": "Enter a valid email",
+    "password": "Password",
+    "passwordTooShort": "At least 8 characters",
+    "confirmPassword": "Confirm password",
+    "passwordsDontMatch": "Passwords don't match",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "switchToSignIn": "Have an account? Sign in",
+    "switchToRegister": "New here? Create an account",
+    "or": "or",
+    "continueWithGoogle": "Continue with Google"
+  },
+  "profile": {
+    "title": "You",
+    "signedInAs": "Signed in as {name}"
+  },
+  "fridges": {
+    "title": "Your fridges",
+    "comingSoon": "Fridge management is coming soon."
+  },
+  "dashboard": {
+    "greeting": "{date} · Hello, {name}!",
+    "userNameFallback": "there",
+    "notificationsUnread": "Notifications, unread",
+    "searchFood": "Search food",
+    "gridView": "Grid view",
+    "listView": "List view",
+    "filter": {
+      "all": "All",
+      "expiring": "Expiring",
+      "dairy": "Dairy",
+      "veg": "Veg",
+      "meat": "Meat",
+      "fish": "Fish"
+    },
+    "firstDibs": "First dibs",
+    "emptyStorage": "Nothing in here yet.",
+    "noMatches": "No food matches.",
+    "scan": "Scan",
+    "addManual": "Add manual",
+    "comingSoon": "{feature} is coming soon.",
+    "feature": {
+      "scanning": "Scanning",
+      "switchingFridges": "Switching fridges",
+      "notifications": "Notifications",
+      "moreFilters": "More filters"
+    },
+    "openedUndo": "{name} opened · eat by {date}",
+    "addedUndo": "{name} added",
+    "removedUndo": "{name} removed",
+    "swipeHint": {
+      "title": "Tip:",
+      "body": "swipe a card → to mark it opened, or ← to remove it.",
+      "close": "Close tip"
+    }
+  },
+  "food": {
+    "unopened": "Unopened",
+    "openedOn": "Opened {date}",
+    "expired": "Expired",
+    "today": "Today",
+    "daysLeft": {
+      "one": "{count} day",
+      "other": "{count} days"
+    },
+    "markOpened": "Mark opened",
+    "remove": "Remove"
+  },
+  "addFood": {
+    "back": "Back to my food",
+    "title": "Add food by hand.",
+    "subtitle": "Pick what it is and we'll suggest when it needs eating.",
+    "whereDoesItGo": "Where does it go?",
+    "whatIsIt": "What is it?",
+    "typeRequired": "Choose what it is.",
+    "chooseType": "Choose a type",
+    "typeNotKeptIn": {
+      "fridge": "{type} isn't usually kept in the fridge. Choose what it is again.",
+      "freezer": "{type} isn't usually kept in the freezer. Choose what it is again.",
+      "pantry": "{type} isn't usually kept in the pantry. Choose what it is again."
+    },
+    "name": "Name",
+    "nameHint": "e.g. Greek yoghurt",
+    "nameRequired": "Give it a name.",
+    "amount": "Amount (optional)",
+    "amountHint": "e.g. 500 g",
+    "bestBefore": "Best before",
+    "datePlaceholder": "Choose a type first, or pick a date",
+    "suggested": "suggested",
+    "addTo": {
+      "fridge": "Add to fridge",
+      "freezer": "Add to freezer",
+      "pantry": "Add to pantry"
+    }
+  },
+  "typePicker": {
+    "title": "What is it?",
+    "keepsIn": {
+      "fridge": "Food that keeps in the fridge",
+      "freezer": "Food that keeps in the freezer",
+      "pantry": "Food that keeps in the pantry"
+    },
+    "searchAll": "Search all types",
+    "searchOther": "Search other",
+    "searchCategory": "Search {category}",
+    "allCategories": "All categories",
+    "otherCategory": "Other",
+    "typeCount": {
+      "one": "{count} type",
+      "other": "{count} types"
+    },
+    "noMatches": "No types match.",
+    "daysShort": "{days} d"
   }
 }
