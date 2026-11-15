@@ -53,6 +53,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           persist: false,
           duration: const Duration(seconds: 5),
         ),
+      );
   }
 
   void _showUndo(String message, VoidCallback undo) => _showSnackBar(
