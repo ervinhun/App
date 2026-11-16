@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_client.dart';
+import 'package:app/features/food/data/product_type_cache.dart';
 import 'package:app/features/food/domain/product_type.dart';
 
 /// The backend's product catalogue: `/api/product-categories` and
@@ -49,7 +51,25 @@ final productCatalogApiProvider = Provider<ProductCatalogApi>(
   (ref) => ProductCatalogApi(ref.watch(dioProvider)),
 );
 
-/// The catalogue, loaded once per session.
-final productTypesProvider = FutureProvider<List<ProductType>>(
-  (ref) => ref.watch(productCatalogApiProvider).productTypes(),
-);
+/// The catalogue: the copy saved on this device first, then the backend's,
+/// which is saved for next time. Loaded on every launch, see `main.dart`.
+///
+/// Only fails when nothing is saved yet and the backend can't be reached.
+final productTypesProvider = StreamProvider<List<ProductType>>((ref) async* {
+  final cache = ref.watch(productTypeCacheProvider);
+  final api = ref.watch(productCatalogApiProvider);
+
+  final saved = await cache.read();
+  if (saved != null) yield saved;
+
+  final List<ProductType> fresh;
+  try {
+    fresh = await api.productTypes();
+  } catch (e) {
+    if (saved == null) rethrow;
+    debugPrint('Could not refresh the product types: $e');
+    return;
+  }
+  await cache.save(fresh);
+  yield fresh;
+});

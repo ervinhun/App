@@ -1,0 +1,274 @@
+import 'dart:async';
+
+import 'package:app/core/api/api_client.dart';
+import 'package:app/core/api/generated/export.dart';
+import 'package:app/core/sync/connectivity.dart';
+import 'package:app/core/sync/sync_controller.dart';
+import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/food/data/food_items_controller.dart';
+import 'package:app/features/food/data/items_remote.dart';
+import 'package:app/features/food/data/sample_food.dart';
+import 'package:app/features/food/domain/food_item.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../../features/auth/fakes.dart';
+import '../../features/food/food_store_test.dart' show food;
+import '../db/test_database.dart';
+
+/// The backend's copy of the fridge, shared with other members.
+class FakeItemsRemote implements ItemsRemote {
+  final items = <String, FoodItem>{};
+  final calls = <String>[];
+  bool offline = false;
+
+  /// The status the backend answers changes to this item with, if not 200.
+  final refuse = <String, int>{};
+
+  void _answer(String call, String id) {
+    if (offline) throw ApiException("Can't reach the server.");
+    calls.add('$call $id');
+    if (refuse[id] case final status?) {
+      throw ApiException('Refused', statusCode: status);
+    }
+  }
+
+  @override
+  Future<FoodItem> save(FoodItem item, {required DateTime changedAt}) async {
+    _answer('save', item.id);
+    return items[item.id] = item;
+  }
+
+  @override
+  Future<void> delete(String id, {required DateTime changedAt}) async {
+    _answer('delete', id);
+    items.remove(id);
+  }
+
+  @override
+  Future<List<FoodItem>> fetchAll() async {
+    if (offline) throw ApiException("Can't reach the server.");
+    return [...items.values];
+  }
+}
+
+class _FakeAuth extends AuthController {
+  _FakeAuth(this._user);
+
+  final UserDto? _user;
+
+  @override
+  Future<UserDto?> build() async => _user;
+
+  void signIn(UserDto user) => state = AsyncData(user);
+}
+
+void main() {
+  late FakeItemsRemote remote;
+  late StreamController<bool> network;
+  late ProviderContainer c;
+
+  ProviderContainer start({UserDto? user = anna}) {
+    c = ProviderContainer.test(
+      overrides: [
+        inMemoryDatabase(),
+        initialFoodProvider.overrideWithValue(const []),
+        itemsRemoteProvider.overrideWithValue(remote),
+        authControllerProvider.overrideWith(() => _FakeAuth(user)),
+        networkAvailableProvider.overrideWith((ref) => network.stream),
+      ],
+    );
+    c.listen(syncControllerProvider, (_, _) {});
+    c.listen(foodItemsProvider, (_, _) {});
+    return c;
+  }
+
+  FoodItemsController foodNotifier() => c.read(foodItemsProvider.notifier);
+  SyncStatus status() => c.read(syncControllerProvider);
+  Set<String> names() => {for (final i in c.read(foodItemsProvider)) i.name};
+
+  /// Lets the saves and the sync they start finish.
+  Future<void> settle() async {
+    for (var i = 0; i < 50; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
+  setUp(() {
+    remote = FakeItemsRemote();
+    network = StreamController<bool>.broadcast();
+  });
+
+  tearDown(() => network.close());
+
+  test('a change is sent to the backend', () async {
+    start();
+    await settle();
+
+    foodNotifier().add(food('a'));
+    await settle();
+
+    expect(remote.calls, ['save a']);
+    expect(status().pending, 0);
+  });
+
+  test(
+    'offline, changes wait; when back online they are sent in order',
+    () async {
+      remote.offline = true;
+      start();
+      await settle();
+
+      foodNotifier()
+        ..add(food('a'))
+        ..add(food('b'));
+      await settle();
+      final opened = foodNotifier().markOpened('a', DateTime(2026, 11, 15));
+      await settle();
+
+      expect(remote.calls, isEmpty);
+      expect(status().pending, 2);
+      expect(status().reachable, isFalse);
+      // Still shown, opened, while offline.
+      expect(c.read(foodItemsProvider).first.isOpened, isTrue);
+      expect(opened.isOpened, isFalse);
+
+      remote.offline = false;
+      network
+        ..add(false)
+        ..add(true);
+      await settle();
+
+      expect(remote.calls, ['save a', 'save b']);
+      expect(remote.items['a']!.isOpened, isTrue);
+      expect(status().pending, 0);
+      expect(status().reachable, isTrue);
+    },
+  );
+
+  test("someone else's newer change wins and shows here", () async {
+    start();
+    await settle();
+    foodNotifier().add(food('a'));
+    await settle();
+
+    // Another member renames it; this device's next sync pulls that in.
+    remote.items['a'] = food('a', name: 'Renamed by Ben');
+    foodNotifier().add(food('b'));
+    await settle();
+
+    expect(names(), {'Renamed by Ben', 'Milk'});
+  });
+
+  test('removal wins over an offline change, and the user is told', () async {
+    start();
+    await settle();
+    foodNotifier().add(food('a', name: 'Yoghurt'));
+    await settle();
+
+    remote.offline = true;
+    foodNotifier().markOpened('a', DateTime(2026, 11, 15));
+    await settle();
+    // Meanwhile another member removes it.
+    remote.items.remove('a');
+    remote.refuse['a'] = 410;
+
+    remote.offline = false;
+    await c.read(syncControllerProvider.notifier).syncNow();
+    await settle();
+
+    expect(names(), isEmpty);
+    expect(remote.items, isEmpty);
+    expect(status().rejected, 1);
+  });
+
+  test(
+    "without the right to change it, the backend's copy comes back",
+    () async {
+      remote.items['a'] = food('a', name: 'Cheese');
+      start();
+      await settle();
+      expect(names(), {'Cheese'});
+
+      // The owner took away this member's rights.
+      remote.refuse['a'] = 403;
+      foodNotifier().remove('a');
+      await settle();
+
+      expect(names(), {'Cheese'});
+      expect(status().rejected, 1);
+      expect(status().pending, 0);
+    },
+  );
+
+  test('a busy backend keeps the change for later', () async {
+    start();
+    await settle();
+    remote.refuse['a'] = 503;
+
+    foodNotifier().add(food('a'));
+    await settle();
+
+    expect(status().pending, 1);
+    expect(status().rejected, 0);
+    expect(status().reachable, isTrue);
+
+    remote.refuse.remove('a');
+    await c.read(syncControllerProvider.notifier).syncNow();
+    expect(status().pending, 0);
+  });
+
+  test('restoring a removed item brings it back under a new id', () async {
+    start();
+    await settle();
+    foodNotifier().add(food('a'));
+    await settle();
+
+    final (removed, index) = foodNotifier().remove('a');
+    await settle();
+    foodNotifier().restore(removed, index);
+    await settle();
+
+    expect(remote.calls.take(2), ['save a', 'delete a']);
+    expect(remote.items.keys, isNot(contains('a')));
+    expect(remote.items.values.single.name, 'Milk');
+    expect(names(), {'Milk'});
+  });
+
+  test("a guest's food waits, and is uploaded when they sign in", () async {
+    start(user: null);
+    await settle();
+
+    foodNotifier().add(food('a'));
+    await settle();
+    expect(remote.calls, isEmpty);
+    expect(status().pending, 1);
+
+    (c.read(authControllerProvider.notifier) as _FakeAuth).signIn(anna);
+    await settle();
+
+    expect(remote.calls, ['save a']);
+    expect(names(), {'Milk'});
+  });
+
+  test("signing in as someone else clears the last account's food", () async {
+    remote.offline = true;
+    start();
+    await settle();
+    foodNotifier().add(food('a'));
+    await settle();
+
+    (c.read(authControllerProvider.notifier) as _FakeAuth).signIn(
+      const UserDto(
+        id: '00000000-0000-0000-0000-000000000002',
+        email: 'ben@example.com',
+        displayName: 'Ben',
+        locale: 'en',
+      ),
+    );
+    await settle();
+
+    expect(names(), isEmpty);
+    expect(status().pending, 0);
+  });
+}

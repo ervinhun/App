@@ -2,7 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/features/food/domain/food_item.dart';
 
-/// What the fridge holds when the app starts: see `foodItemsProvider`.
+/// What the fridge holds the first time the app runs: see
+/// `FoodStore.seedOnce`. It is never sent to the backend.
 ///
 /// Sample data until the backend has an items endpoint. Dates are relative to
 /// today, so the dashboard always shows a mix of soon, upcoming and later.
