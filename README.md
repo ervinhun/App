@@ -15,6 +15,34 @@ cp .env.example .env # then fill in the values
 flutter run --dart-define-from-file=.env
 ```
 
+## Current state
+
+| Area | State | PR |
+| --- | --- | --- |
+| OAuth login | Done | [#1](../../pull/1) |
+| Refresh tokens, backend logout, generated API client | Done | [#2](../../pull/2) |
+| Planned pages list | Done | [#5](../../pull/5) |
+| Dashboard (fridge/freezer/pantry, expiry filter, swipe actions with undo) | Done | [#6](../../pull/6) |
+| Expiry notifications (Android + iOS) | In review | [#8](../../pull/8) |
+| App name, icon and local-network access for device builds | In review | [#7](../../pull/7) |
+
+Food items are sample data held in memory until the backend has an items endpoint.
+
+### Expiry notifications
+
+- Asks for the system notification permission, and shows a native dialog that links to settings if it is refused.
+- Warning and danger days (default 7 and 2) and the notification time (default 16:00) come from the backend, are saved on the device and are rechecked at startup.
+- A daily background task refreshes the list just before the notification time and falls back to the saved list when offline.
+- One digest per time, such as "You have 3 items which expire in 7 days, and 2 items which expire in 2 days". Tapping it opens the dashboard filtered by expiry.
+- Follows each fridge's notification recipients, and reports delivered reminders to `notification_dispatches`.
+- The Management tab has a "Send test notification" button that uses the real data.
+- Needs backend endpoints that don't exist yet (`/api/fridges/{id}/items`, `/api/fridges/{id}/notification-dispatches`) and a notification-time field; until then the app uses the saved list and retries dispatch reports.
+- The message text is English only; localization is a separate task.
+
+### Running on a phone
+
+Copy `app/.env.example` to `app/.env.phone` with your computer's LAN IP as the API address (it is git-ignored), then run with `--dart-define-from-file=.env.phone`. On iOS use a release build to launch from the home screen. CocoaPods is still required for iOS.
+
 ## Backend API client
 
 The client for the backend (`AuthClient`, `FridgesClient`, and their request/response models) is generated into [`app/lib/core/api/generated/`](app/lib/core/api/generated/) by [`swagger_parser`](https://pub.dev/packages/swagger_parser) from the backend's OpenAPI document. Don't edit it by hand. After a backend change to an endpoint or DTO, build the backend (that rewrites `Backend/openapi/FridgeFriend.json`), then, with the parent `FridgeFriend` repo checked out:
@@ -39,7 +67,8 @@ and commit the result. Wrap calls in `apiCall(...)` (`core/api/api_client.dart`)
 
 ## Tech stack
 
-- Flutter (Android + iOS)
+- Flutter (Android + iOS), Riverpod, go_router, Dio + Retrofit
+- flutter_local_notifications and workmanager for expiry reminders
 - Firebase Crashlytics & Analytics
 
 ## Planned pages
