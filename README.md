@@ -39,9 +39,27 @@ Food items are sample data held in memory until the backend has an items endpoin
 - Needs backend endpoints that don't exist yet (`/api/fridges/{id}/items`, `/api/fridges/{id}/notification-dispatches`) and a notification-time field; until then the app uses the saved list and retries dispatch reports.
 - The message text is English only; localization is a separate task.
 
-### Running on a phone
+### Deploying to a real iPhone
 
-Copy `app/.env.example` to `app/.env.phone` with your computer's LAN IP as the API address (it is git-ignored), then run with `--dart-define-from-file=.env.phone`. On iOS use a release build to launch from the home screen. CocoaPods is still required for iOS.
+Needs a Mac with Xcode, a cable, and a free Apple ID (a Personal Team; no paid developer account).
+
+1. On the iPhone, turn on Developer Mode (Settings > Privacy & Security > Developer Mode), restart, and trust the Mac when asked.
+2. In Xcode, open `app/ios/Runner.xcworkspace`, select Runner > Signing & Capabilities, tick "Automatically manage signing" and pick your Personal Team. Change the bundle identifier if Xcode says it is taken.
+3. Copy `app/.env.example` to `app/.env.phone` (git-ignored) and set the API address to your computer's LAN IP, not `localhost`. The phone and computer must be on the same Wi-Fi. The branch in PR #7 allows plain http to local addresses.
+4. Build a release version, because a debug build can't be launched from the home screen:
+
+   ```sh
+   cd app
+   flutter build ios --release --dart-define-from-file=.env.phone
+   xcrun devicectl list devices
+   xcrun devicectl device install app --device <device id> build/ios/iphoneos/Runner.app
+   ```
+
+   Or run `flutter run --release --dart-define-from-file=.env.phone -d <device id>`.
+5. The first launch says "Untrusted Developer": on the iPhone open Settings > General > VPN & Device Management, trust your Apple ID, then open the app. Installing with `devicectl` keeps the trust between installs.
+6. Allow notifications when asked. Use the "Send test notification" button on the Management tab to check them.
+
+Notes: free-signing builds expire after 7 days, so install again. CocoaPods is still required for iOS; don't run `pod install` by hand, `flutter build` does it. The iOS background refresh time is chosen by the system.
 
 ## Backend API client
 
