@@ -18,7 +18,10 @@ import 'package:app/features/food/domain/food_item.dart';
 
 /// The "My food" tab: what's in the current fridge, soonest to expire first.
 class DashboardScreen extends ConsumerStatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.initialFilter});
+
+  /// The filter to start on, and to switch to when it changes.
+  final FoodFilter? initialFilter;
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
@@ -26,12 +29,19 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _query = '';
-  FoodFilter _filter = FoodFilter.all;
+  late FoodFilter _filter = widget.initialFilter ?? FoodFilter.all;
   StorageLocation _storage = StorageLocation.fridge;
   FoodView _view = FoodView.list;
 
   /// Whether the top card has already nudged to teach swiping, this session.
   bool _peeked = false;
+
+  @override
+  void didUpdateWidget(DashboardScreen old) {
+    super.didUpdateWidget(old);
+    final filter = widget.initialFilter;
+    if (filter != null && filter != old.initialFilter) _filter = filter;
+  }
 
   FoodItemsController get _food => ref.read(foodItemsProvider.notifier);
 
@@ -53,6 +63,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           persist: false,
           duration: const Duration(seconds: 5),
         ),
+      );
   }
 
   void _showUndo(String message, VoidCallback undo) => _showSnackBar(

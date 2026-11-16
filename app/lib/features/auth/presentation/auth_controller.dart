@@ -21,6 +21,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
 
   @override
   Future<UserDto?> build() async {
+    await _tokens.migrateAccessibility();
     if (await _tokens.read() == null) return null;
     try {
       return await apiCall(_api.me());
