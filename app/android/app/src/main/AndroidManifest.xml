@@ -2,7 +2,7 @@
     <!-- Calls the FridgeFriend backend and Google sign-in. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="app"
+        android:label="FridgeFriend"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
