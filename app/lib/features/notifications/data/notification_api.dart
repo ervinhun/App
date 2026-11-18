@@ -5,7 +5,6 @@ import 'package:app/core/api/api_client.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/features/notifications/data/reminders_storage.dart';
 import 'package:app/features/notifications/domain/fridge_reminders.dart';
-import 'package:app/features/notifications/domain/notification_settings.dart';
 
 /// The backend's notification endpoints. Throws [ApiException] on failure.
 class NotificationApi {
@@ -26,19 +25,7 @@ class NotificationApi {
   Future<FridgeReminders> _forFridge(String id) async {
     final response = await NotificationItemsClient(_dio)
         .getNotificationItems(fridgeId: id);
-    return FridgeReminders(
-      fridgeId: id,
-      settings: NotificationSettings.fromResponse(response),
-      items: [
-        for (final item in response.items ?? <NotificationItemResponse>[])
-          if (item.id != null && item.expiryDate != null)
-            ReminderItem(
-              id: item.id!,
-              expiresOn: item.expiryDate!,
-              skipWarning: item.skipWarning ?? false,
-            ),
-      ],
-    );
+    return FridgeReminders.fromResponse(id, response);
   }
 
   /// Reports a delivered reminder for the backend's `notification_dispatches`:
