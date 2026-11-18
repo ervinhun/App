@@ -29,9 +29,20 @@ class NotificationSettings {
     json['notificationTime'],
   );
 
-  /// The settings in the backend's response, with the same fallbacks.
-  factory NotificationSettings.fromResponse(
+  /// The settings in the backend's notification-items response, with the same
+  /// fallbacks.
+  factory NotificationSettings.fromNotificationItemsResponse(
     NotificationItemsResponse response,
+  ) => _read(
+    response.warningDaysBefore,
+    response.dangerDaysBefore,
+    response.notificationTime,
+  );
+
+  /// The settings in the backend's notification-settings response, with the
+  /// same fallbacks.
+  factory NotificationSettings.fromNotificationSettingsResponse(
+    NotificationSettingsResponse response,
   ) => _read(
     response.warningDaysBefore,
     response.dangerDaysBefore,

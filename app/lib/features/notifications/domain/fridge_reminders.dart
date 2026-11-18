@@ -57,7 +57,7 @@ class FridgeReminders {
     NotificationItemsResponse response,
   ) => FridgeReminders(
     fridgeId: fridgeId,
-    settings: NotificationSettings.fromResponse(response),
+    settings: NotificationSettings.fromNotificationItemsResponse(response),
     items: [
       for (final item in response.items ?? <NotificationItemResponse>[])
         if (item.id != null && item.expiryDate != null)

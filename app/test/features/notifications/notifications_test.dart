@@ -79,16 +79,31 @@ void main() {
     });
   });
 
-  test('NotificationSettings.fromResponse falls back like fromJson', () {
-    final s = NotificationSettings.fromResponse(
-      const NotificationItemsResponse(
-        warningDaysBefore: 5,
-        notificationTime: '25:99',
-      ),
-    );
-    expect(s.warningDaysBefore, 5);
-    expect(s.dangerDaysBefore, 2);
-    expect((s.hour, s.minute), (16, 0));
+  group('NotificationSettings from a backend response', () {
+    test('notification-items falls back like fromJson', () {
+      final s = NotificationSettings.fromNotificationItemsResponse(
+        const NotificationItemsResponse(
+          warningDaysBefore: 5,
+          notificationTime: '25:99',
+        ),
+      );
+      expect(s.warningDaysBefore, 5);
+      expect(s.dangerDaysBefore, 2);
+      expect((s.hour, s.minute), (16, 0));
+    });
+
+    test('notification-settings reads days and time', () {
+      final s = NotificationSettings.fromNotificationSettingsResponse(
+        const NotificationSettingsResponse(
+          warningDaysBefore: 10,
+          dangerDaysBefore: 3,
+          notificationTime: '08:30:00',
+        ),
+      );
+      expect(s.warningDaysBefore, 10);
+      expect(s.dangerDaysBefore, 3);
+      expect((s.hour, s.minute), (8, 30));
+    });
   });
 
   group('NotificationApi.fetchReminders', () {
