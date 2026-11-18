@@ -7,7 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/features/notifications/data/background_refresh.dart';
+import 'package:app/features/notifications/data/notification_api.dart';
+import 'package:app/features/notifications/data/notification_service.dart';
+import 'package:app/features/notifications/data/reminders_storage.dart';
+
 import 'core/storage/fake_hint_storage.dart';
+import 'features/notifications/fakes.dart';
 import 'features/auth/fakes.dart';
 
 void main() {
@@ -23,6 +29,14 @@ void main() {
           signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
           hintStorageProvider.overrideWithValue(FakeHintStorage()),
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
+          backgroundRefreshProvider.overrideWithValue(FakeBackgroundRefresh()),
+          remindersStorageProvider.overrideWithValue(FakeRemindersStorage()),
+          notificationApiProvider.overrideWithValue(
+            FakeNotificationApi(fails: true),
+          ),
         ],
         child: const FridgeFriendApp(),
       ),

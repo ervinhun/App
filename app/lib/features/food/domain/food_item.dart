@@ -45,6 +45,7 @@ class FoodItem {
     required this.productType,
     required this.storage,
     required this.bestBefore,
+    this.addedOn,
     this.openedOn,
     this.openedExpiresOn,
   });
@@ -66,6 +67,9 @@ class FoodItem {
 
   /// The date printed on the pack.
   final DateTime bestBefore;
+
+  /// The day it was added, if known.
+  final DateTime? addedOn;
   final DateTime? openedOn;
 
   /// The earlier date it must be eaten by once opened.
@@ -77,6 +81,14 @@ class FoodItem {
   bool get isOpened => openedOn != null;
 
   DateTime get expiresOn => openedExpiresOn ?? bestBefore;
+
+  /// Whether its whole shelf life, from [addedOn] to [expiresOn], is no longer
+  /// than [warningDays], so a warning that far ahead would come the day it is
+  /// added.
+  bool skipsWarning(int warningDays) =>
+      addedOn != null &&
+      _dateOnly(expiresOn).difference(_dateOnly(addedOn!)).inDays <=
+          warningDays;
 
   /// Whole days from [today] until [expiresOn]: 0 on the day, negative after.
   int daysLeft(DateTime today) =>
@@ -100,6 +112,7 @@ class FoodItem {
       productType: productType,
       storage: storage,
       bestBefore: bestBefore,
+      addedOn: addedOn,
       openedOn: day,
       openedExpiresOn: eatBy.isBefore(bestBefore) ? eatBy : bestBefore,
     );

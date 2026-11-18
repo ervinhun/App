@@ -21,7 +21,7 @@ class _FridgesClient implements FridgesClient {
   final ParseErrorLogger? errorLogger;
 
   @override
-  Future<FridgeResponse> create({required SaveFridgeRequest body}) async {
+  Future<FridgeResponse> createFridge({required SaveFridgeRequest body}) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -108,7 +108,7 @@ class _FridgesClient implements FridgesClient {
   }
 
   @override
-  Future<FridgeResponse> getApiFridgesId({required String id}) async {
+  Future<FridgeResponse> getFridge({required String id}) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -135,7 +135,7 @@ class _FridgesClient implements FridgesClient {
   }
 
   @override
-  Future<FridgeResponse> update({
+  Future<FridgeResponse> updateFridge({
     required String id,
     required SaveFridgeRequest body,
   }) async {
@@ -166,7 +166,7 @@ class _FridgesClient implements FridgesClient {
   }
 
   @override
-  Future<void> delete({required String id}) async {
+  Future<void> deleteFridge({required String id}) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};

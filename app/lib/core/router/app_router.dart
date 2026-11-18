@@ -7,9 +7,11 @@ import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/auth/presentation/login_screen.dart';
 import 'package:app/features/auth/presentation/startup_error_screen.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:app/features/dashboard/presentation/widgets/food_filters.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/presentation/add_food_screen.dart';
 import 'package:app/features/fridges/presentation/fridges_screen.dart';
+import 'package:app/features/notifications/presentation/notifications_bootstrap.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
 
 abstract final class Routes {
@@ -17,6 +19,9 @@ abstract final class Routes {
   static const login = '/login';
   static const startupError = '/startup-error';
   static const home = '/';
+
+  /// The My food tab filtered to what is about to expire.
+  static const expiring = '/?filter=expiring';
   static const management = '/management';
   static const you = '/you';
 
@@ -77,13 +82,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (_, _, shell) => HomeShell(shell: shell),
+        builder: (_, _, shell) =>
+            NotificationsBootstrap(child: HomeShell(shell: shell)),
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: Routes.home,
-                builder: (_, _) => const DashboardScreen(),
+                builder: (_, state) => DashboardScreen(
+                  // From tapping an expiry reminder.
+                  initialFilter:
+                      state.uri.queryParameters['filter'] == 'expiring'
+                      ? FoodFilter.expiring
+                      : null,
+                ),
               ),
             ],
           ),
