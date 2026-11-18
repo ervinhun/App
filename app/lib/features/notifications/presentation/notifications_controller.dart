@@ -31,7 +31,13 @@ class NotificationsController {
       settings: const NotificationSettings(),
       items: [
         for (final item in _ref.read(foodItemsProvider))
-          ReminderItem(id: item.id, expiresOn: item.expiresOn),
+          ReminderItem(
+            id: item.id,
+            expiresOn: item.expiresOn,
+            skipWarning: item.skipsWarning(
+              const NotificationSettings().warningDaysBefore,
+            ),
+          ),
       ],
     ),
   ];

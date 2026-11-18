@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:app/core/api/api_client.dart';
 import 'package:app/features/notifications/data/notification_api.dart';
 import 'package:app/features/notifications/data/notification_service.dart';
 import 'package:app/features/notifications/data/reminders_storage.dart';
@@ -73,11 +74,14 @@ class NotificationSync {
         for (final id in dispatch.warningIds) notifiedKey(id, danger: false),
         for (final id in dispatch.dangerIds) notifiedKey(id, danger: true),
       ]);
+      // The fallback fridge is only on this device, so there's no one to tell.
+      if (dispatch.fridgeId.isEmpty) continue;
       try {
         await api.reportDispatch(dispatch);
       } catch (e) {
         debugPrint('Could not report a delivered reminder: $e');
-        failed.add(dispatch);
+        // A 404 means the item or fridge is gone, so retrying would never work.
+        if (e is! ApiException || e.statusCode != 404) failed.add(dispatch);
       }
     }
     return failed;

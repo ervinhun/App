@@ -1,3 +1,5 @@
+import 'package:app/core/api/generated/export.dart';
+
 /// When to warn about food that is about to expire: how many days ahead, and
 /// at what time of day.
 class NotificationSettings {
@@ -21,11 +23,30 @@ class NotificationSettings {
 
   /// Reads the backend's notification settings. Anything missing or invalid,
   /// such as the time, falls back to its default.
-  factory NotificationSettings.fromJson(Map<String, dynamic> json) {
-    final time = _parseTime(json['notificationTime']);
+  factory NotificationSettings.fromJson(Map<String, dynamic> json) => _read(
+    json['warningDaysBefore'],
+    json['dangerDaysBefore'],
+    json['notificationTime'],
+  );
+
+  /// The settings in the backend's response, with the same fallbacks.
+  factory NotificationSettings.fromResponse(
+    NotificationItemsResponse response,
+  ) => _read(
+    response.warningDaysBefore,
+    response.dangerDaysBefore,
+    response.notificationTime,
+  );
+
+  static NotificationSettings _read(
+    Object? warningDays,
+    Object? dangerDays,
+    Object? notificationTime,
+  ) {
+    final time = _parseTime(notificationTime);
     return NotificationSettings(
-      warningDaysBefore: _days(json['warningDaysBefore']) ?? defaultWarningDays,
-      dangerDaysBefore: _days(json['dangerDaysBefore']) ?? defaultDangerDays,
+      warningDaysBefore: _days(warningDays) ?? defaultWarningDays,
+      dangerDaysBefore: _days(dangerDays) ?? defaultDangerDays,
       hour: time?.$1 ?? defaultHour,
       minute: time?.$2 ?? defaultMinute,
     );

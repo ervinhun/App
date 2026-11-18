@@ -13,45 +13,30 @@ class NotificationApi {
 
   final Dio _dio;
 
-  /// Each of the user's fridges that notifies them, with its settings and the
-  /// items they are to hear about.
+  /// Each of the user's fridges, with its settings and the items they are to
+  /// hear about. The backend has already applied the fridge's recipient rules,
+  /// so a fridge they aren't a recipient of comes back without items.
   Future<List<FridgeReminders>> fetchReminders() => apiCall(_fetch());
 
   Future<List<FridgeReminders>> _fetch() async {
-    final userId = (await AuthClient(_dio).me()).id;
     final fridges = await FridgesClient(_dio).getMine();
-    final all = await Future.wait([
-      for (final f in fridges) _forFridge(f, userId),
-    ]);
-    return [for (final r in all) ?r];
+    return Future.wait([for (final f in fridges) _forFridge(f.id!)]);
   }
 
-  /// Null if [userId] isn't a recipient: `custom` lists only some members, and
-  /// `adder_and_owners` gives non-owners just the items they added.
-  Future<FridgeReminders?> _forFridge(
-    FridgeResponse fridge,
-    String userId,
-  ) async {
-    final id = fridge.id!;
-    final (settings, items) = await (
-      _dio.get<Map<String, dynamic>>('/api/fridges/$id/notification-settings'),
-      _dio.get<List<dynamic>>('/api/fridges/$id/items'),
-    ).wait;
-    final data = settings.data!;
-    final scope = data['recipientsScope'];
-    final picked =
-        (data['recipientUserIds'] as List?)?.contains(userId) ?? false;
-    if (scope == 'custom' && !picked) return null;
-    final onlyOwn = scope == 'adder_and_owners' && fridge.isOwner != true;
+  Future<FridgeReminders> _forFridge(String id) async {
+    final response = await NotificationItemsClient(_dio)
+        .getNotificationItems(fridgeId: id);
     return FridgeReminders(
       fridgeId: id,
-      settings: NotificationSettings.fromJson(data),
+      settings: NotificationSettings.fromResponse(response),
       items: [
-        for (final item in items.data!.cast<Map<String, dynamic>>())
-          if (!onlyOwn || item['addedByUserId'] == userId)
-            if (DateTime.tryParse(item['expiryDate'] as String? ?? '')
-                case final expires?)
-              ReminderItem(id: item['id'] as String, expiresOn: expires),
+        for (final item in response.items ?? <NotificationItemResponse>[])
+          if (item.id != null && item.expiryDate != null)
+            ReminderItem(
+              id: item.id!,
+              expiresOn: item.expiryDate!,
+              skipWarning: item.skipWarning ?? false,
+            ),
       ],
     );
   }
@@ -59,17 +44,17 @@ class NotificationApi {
   /// Reports a delivered reminder for the backend's `notification_dispatches`:
   /// a warning is stage `warning`, a danger notice `expiry`.
   Future<void> reportDispatch(PendingDispatch dispatch) => apiCall(
-    _dio.post<void>(
-      '/api/fridges/${dispatch.fridgeId}/notification-dispatches',
-      data: {
-        'sentAt': dispatch.at.toUtc().toIso8601String(),
-        'items': [
+    NotificationDispatchesClient(_dio).reportDispatches(
+      fridgeId: dispatch.fridgeId,
+      body: ReportDispatchesRequest(
+        sentAt: dispatch.at.toUtc(),
+        items: [
           for (final id in dispatch.warningIds)
-            {'itemId': id, 'stage': 'warning'},
+            DispatchedItem(itemId: id, stage: 'warning'),
           for (final id in dispatch.dangerIds)
-            {'itemId': id, 'stage': 'expiry'},
+            DispatchedItem(itemId: id, stage: 'expiry'),
         ],
-      },
+      ),
     ),
   );
 }

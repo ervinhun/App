@@ -2,19 +2,29 @@ import 'package:app/features/notifications/domain/notification_settings.dart';
 
 /// One item that can trigger a reminder.
 class ReminderItem {
-  const ReminderItem({required this.id, required this.expiresOn});
+  const ReminderItem({
+    required this.id,
+    required this.expiresOn,
+    this.skipWarning = false,
+  });
 
   final String id;
   final DateTime expiresOn;
 
+  /// Its whole shelf life is no longer than the warning period, so the warning
+  /// would come the moment it is added: only the danger notice applies.
+  final bool skipWarning;
+
   factory ReminderItem.fromJson(Map<String, dynamic> json) => ReminderItem(
     id: json['id'] as String,
     expiresOn: DateTime.parse(json['expiresOn'] as String),
+    skipWarning: json['skipWarning'] as bool? ?? false,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'expiresOn': expiresOn.toIso8601String().substring(0, 10),
+    'skipWarning': skipWarning,
   };
 }
 

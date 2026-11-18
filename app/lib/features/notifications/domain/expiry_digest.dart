@@ -77,6 +77,7 @@ List<ExpiryDigest> expiryDigests(
       final left = date(item.expiresOn).difference(date(at)).inDays;
       if (left < 0 || left > settings.warningDaysBefore) continue;
       final inDanger = left <= settings.dangerDaysBefore;
+      if (!inDanger && item.skipWarning) continue;
       final entersToday =
           left ==
           (inDanger ? settings.dangerDaysBefore : settings.warningDaysBefore);

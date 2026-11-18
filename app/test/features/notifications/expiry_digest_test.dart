@@ -45,6 +45,21 @@ void main() {
     expect(digests, hasLength(2));
   });
 
+  test('an item with a short shelf life skips the warning, not the danger', () {
+    final f = FridgeReminders(
+      fridgeId: 'f1',
+      settings: settings,
+      items: [
+        ReminderItem(id: 'bread', expiresOn: inDays(5), skipWarning: true),
+      ],
+    );
+    // 5 days out it would be in warning, but the warning is skipped...
+    expect(expiryDigests(f, now).first.dangerIds, ['bread']);
+    // ...so the first digest is the one 3 days later, when it is in danger.
+    expect(expiryDigests(f, now).first.at, DateTime(2026, 11, 19, 16));
+    expect(expiryDigests(f, now), hasLength(1));
+  });
+
   test('a stage already notified is not repeated', () {
     final notified = {notifiedKey('i0', danger: true)};
     final digests = expiryDigests(fridge([1, 1]), now, notified: notified);

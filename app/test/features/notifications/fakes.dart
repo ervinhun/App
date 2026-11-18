@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'package:app/core/api/api_client.dart';
 import 'package:app/features/notifications/data/background_refresh.dart';
 import 'package:app/features/notifications/data/notification_api.dart';
 import 'package:app/features/notifications/data/notification_service.dart';
@@ -85,6 +86,9 @@ class FakeNotificationApi extends NotificationApi {
   List<FridgeReminders> remote;
   bool fails;
   bool reportFails = false;
+
+  /// The status the backend answers a report with, instead of `offline`.
+  int? reportStatus;
   final reported = <PendingDispatch>[];
 
   @override
@@ -95,6 +99,9 @@ class FakeNotificationApi extends NotificationApi {
 
   @override
   Future<void> reportDispatch(PendingDispatch dispatch) async {
+    if (reportStatus != null) {
+      throw ApiException('failed', statusCode: reportStatus);
+    }
     if (reportFails) throw Exception('offline');
     reported.add(dispatch);
   }

@@ -136,6 +136,8 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
       bestBefore:
           _bestBefore ??
           _daysFromToday(type.expiryDaysIn(_storage) ?? type.defaultExpiryDays),
+      // The backend dates additions in UTC, so this does too.
+      addedOn: DateTime.now().toUtc(),
     );
     ref.read(foodItemsProvider.notifier).add(item);
     context.pop(item);

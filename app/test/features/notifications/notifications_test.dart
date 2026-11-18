@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:app/core/api/generated/export.dart';
 import 'package:app/features/notifications/data/background_refresh.dart';
 import 'package:app/features/notifications/data/notification_api.dart';
 import 'package:app/features/notifications/data/notification_service.dart';
@@ -78,56 +79,70 @@ void main() {
     });
   });
 
-  group('NotificationApi.fetchReminders recipients', () {
-    Future<List<FridgeReminders>> fetch({
-      required String scope,
-      bool isOwner = false,
-      List<String> recipients = const [],
-    }) {
+  test('NotificationSettings.fromResponse falls back like fromJson', () {
+    final s = NotificationSettings.fromResponse(
+      const NotificationItemsResponse(
+        warningDaysBefore: 5,
+        notificationTime: '25:99',
+      ),
+    );
+    expect(s.warningDaysBefore, 5);
+    expect(s.dangerDaysBefore, 2);
+    expect((s.hour, s.minute), (16, 0));
+  });
+
+  group('NotificationApi.fetchReminders', () {
+    test('reads each fridge from its notification-items', () async {
       final dio = Dio()
         ..httpClientAdapter = _Backend({
-          '/api/Auth/Me': {
-            'id': 'me',
-            'email': 'me@example.com',
-            'displayName': 'Me',
-            'locale': 'en',
-          },
           '/api/fridges': [
-            {'id': 'f1', 'name': 'Home', 'isOwner': isOwner},
+            {'id': 'f1', 'name': 'Home'},
+            {'id': 'f2', 'name': 'Cabin'},
           ],
-          '/api/fridges/f1/notification-settings': {
-            'recipientsScope': scope,
-            'recipientUserIds': recipients,
+          '/api/fridges/f1/notification-items': {
+            'fridgeId': 'f1',
             'warningDaysBefore': 5,
             'dangerDaysBefore': 1,
+            'notificationTime': '08:30:00',
+            'items': [
+              {'id': 'milk', 'expiryDate': '2026-12-01', 'skipWarning': false},
+              {'id': 'bread', 'expiryDate': '2026-12-02', 'skipWarning': true},
+            ],
           },
-          '/api/fridges/f1/items': [
-            {'id': 'mine', 'addedByUserId': 'me', 'expiryDate': '2026-12-01'},
-            {'id': 'theirs', 'addedByUserId': 'x', 'expiryDate': '2026-12-02'},
-          ],
+          '/api/fridges/f2/notification-items': {
+            'fridgeId': 'f2',
+            'warningDaysBefore': 7,
+            'dangerDaysBefore': 2,
+            'notificationTime': '16:00:00',
+            'items': [],
+          },
         });
-      return NotificationApi(dio).fetchReminders();
-    }
 
-    test('all members: every item, with the fridge settings', () async {
-      final r = await fetch(scope: 'all_members');
-      expect(r.single.items.map((i) => i.id), ['mine', 'theirs']);
-      expect(r.single.settings.warningDaysBefore, 5);
+      final r = await NotificationApi(dio).fetchReminders();
+
+      expect(r.map((f) => f.fridgeId), ['f1', 'f2']);
+      expect(r[0].settings.warningDaysBefore, 5);
+      expect((r[0].settings.hour, r[0].settings.minute), (8, 30));
+      expect(r[0].items.map((i) => i.id), ['milk', 'bread']);
+      expect(r[0].items.map((i) => i.skipWarning), [false, true]);
+      expect(r[0].items.first.expiresOn.day, 1);
+      expect(r[1].items, isEmpty);
     });
+  });
 
-    test('adder and owners: a member gets only what they added', () async {
-      final r = await fetch(scope: 'adder_and_owners');
-      expect(r.single.items.map((i) => i.id), ['mine']);
-    });
-
-    test('adder and owners: the owner gets everything', () async {
-      final r = await fetch(scope: 'adder_and_owners', isOwner: true);
-      expect(r.single.items, hasLength(2));
-    });
-
-    test('custom: only if the user was picked', () async {
-      expect(await fetch(scope: 'custom', recipients: ['x']), isEmpty);
-      expect(await fetch(scope: 'custom', recipients: ['me']), hasLength(1));
+  group('ReminderItem', () {
+    test('keeps skipWarning through the saved JSON, and defaults it off', () {
+      final item = ReminderItem(
+        id: 'a',
+        expiresOn: DateTime(2026, 12, 1),
+        skipWarning: true,
+      );
+      expect(ReminderItem.fromJson(item.toJson()).skipWarning, isTrue);
+      expect(
+        ReminderItem.fromJson({'id': 'a', 'expiresOn': '2026-12-01'})
+            .skipWarning,
+        isFalse,
+      );
     });
   });
 
@@ -222,6 +237,61 @@ void main() {
 
       expect(storage.pending, hasLength(1));
     });
+
+    test(
+      'a report the backend answers 404 to is dropped, not retried',
+      () async {
+        storage.pending = [
+          PendingDispatch(
+            fridgeId: 'f1',
+            at: DateTime(2026, 11, 16, 16),
+            warningIds: const ['gone'],
+            dangerIds: const [],
+          ),
+        ];
+        api.reportStatus = 404;
+
+        await sync(() => DateTime(2026, 11, 16, 17)).refresh();
+
+        expect(storage.pending, isEmpty);
+      },
+    );
+
+    test('a report the backend answers 500 to is kept to try again', () async {
+      storage.pending = [
+        PendingDispatch(
+          fridgeId: 'f1',
+          at: DateTime(2026, 11, 16, 16),
+          warningIds: const ['milk'],
+          dangerIds: const [],
+        ),
+      ];
+      api.reportStatus = 500;
+
+      await sync(() => DateTime(2026, 11, 16, 17)).refresh();
+
+      expect(storage.pending, hasLength(1));
+    });
+
+    test(
+      'the on-device fallback fridge is counted as notified but never reported',
+      () async {
+        storage.pending = [
+          PendingDispatch(
+            fridgeId: '',
+            at: DateTime(2026, 11, 16, 16),
+            warningIds: const ['milk'],
+            dangerIds: const [],
+          ),
+        ];
+
+        await sync(() => DateTime(2026, 11, 16, 17))
+            .refresh(fallback: [_fridge()]);
+
+        expect(api.reported, isEmpty);
+        expect(storage.pending, isEmpty);
+      },
+    );
 
     test('nothing is reported when notifications are off', () async {
       service.allowed = false;
