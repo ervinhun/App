@@ -5,9 +5,12 @@ import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/food/data/food_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/db/test_database.dart';
+import '../../food/food_store_test.dart' show food;
 import '../fakes.dart';
 
 void main() {
@@ -18,6 +21,7 @@ void main() {
 
   ProviderContainer container() => ProviderContainer.test(
     overrides: [
+      inMemoryDatabase(),
       tokenStorageProvider.overrideWithValue(tokens),
       authClientProvider.overrideWithValue(api),
       signInClientProvider.overrideWithValue(api),
@@ -31,6 +35,20 @@ void main() {
     api = FakeAuthClient();
     google = FakeGoogleAuth();
     guests = FakeGuestStorage();
+  });
+
+  test('when the backend ends the session, the food is forgotten', () async {
+    tokens.token = 'jwt';
+    final c = container();
+    await c.read(authControllerProvider.future);
+    final store = c.read(foodStoreProvider);
+    await store.claimFor(anna.id);
+    await store.save(food('a'), DateTime(2026, 11, 15));
+
+    await c.read(authControllerProvider.notifier).endSession();
+
+    expect(await store.items(), isEmpty);
+    expect(await store.pendingCount(), 0);
   });
 
   group('startup', () {
@@ -172,6 +190,7 @@ void main() {
       final c = ProviderContainer.test(
         retry: (_, _) => null,
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),

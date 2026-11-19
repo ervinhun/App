@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
-import 'package:app/features/food/data/food_items_controller.dart';
-import 'package:app/features/food/data/food_store.dart';
 
 /// Placeholder "You" tab until the profile screen is designed.
 class ProfileScreen extends ConsumerWidget {
@@ -30,8 +28,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// Signs out and forgets this device's food, so the next person to use the
-  /// phone doesn't see it. Asks first if some changes haven't been uploaded.
+  /// Signs out, which forgets this device's food (see
+  /// `AuthController.endSession`). Asks first if some changes haven't been
+  /// uploaded.
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final pending = ref.read(syncControllerProvider).pending;
     if (pending > 0) {
@@ -60,8 +59,6 @@ class ProfileScreen extends ConsumerWidget {
       );
       if (confirmed != true) return;
     }
-    await ref.read(foodStoreProvider).clear();
-    ref.invalidate(foodItemsProvider);
     await ref.read(authControllerProvider.notifier).signOut();
   }
 }
