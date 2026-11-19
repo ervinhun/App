@@ -7,11 +7,13 @@ import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/fridges/data/fridges_cache.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../features/auth/fakes.dart';
+import '../../features/fridges/fakes.dart' show FakeFridgesCache;
 import '../db/test_database.dart';
 
 const _fridges = '/api/fridges';
@@ -151,6 +153,7 @@ void main() {
       retry: retry,
       overrides: [
         inMemoryDatabase(),
+        fridgesCacheProvider.overrideWithValue(FakeFridgesCache()),
         tokenStorageProvider.overrideWithValue(tokens),
         googleAuthProvider.overrideWithValue(google),
         signInClientProvider.overrideWithValue(

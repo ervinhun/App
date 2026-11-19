@@ -4,6 +4,7 @@ import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/food/data/product_catalog_api.dart';
+import 'package:app/features/fridges/data/fridges_cache.dart';
 import 'package:app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,11 +13,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'core/db/test_database.dart';
 import 'core/storage/fake_hint_storage.dart';
 import 'features/auth/fakes.dart';
+import 'features/fridges/fakes.dart';
 
 void main() {
   late FakeTokenStorage tokens;
   late FakeAuthClient api;
   late FakeGuestStorage guests;
+  late FakeFridgesCache fridges;
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
@@ -29,6 +32,7 @@ void main() {
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
           hintStorageProvider.overrideWithValue(FakeHintStorage()),
           guestStorageProvider.overrideWithValue(guests),
+          fridgesCacheProvider.overrideWithValue(fridges),
           productTypesProvider.overrideWith((ref) => Stream.value(const [])),
         ],
         child: const FridgeFriendApp(),
@@ -41,6 +45,7 @@ void main() {
     tokens = FakeTokenStorage();
     api = FakeAuthClient();
     guests = FakeGuestStorage();
+    fridges = FakeFridgesCache();
   });
 
   // The variant sets and resets debugDefaultTargetPlatformOverride; resetting it in
@@ -118,6 +123,37 @@ void main() {
     await tester.tap(find.byTooltip('Sign out'));
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);
+  }, variant: android);
+
+  Future<void> signOutFromYou(WidgetTester tester) async {
+    tokens.token = 'jwt';
+    await pumpApp(tester);
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sign out'));
+    await tester.pumpAndSettle();
+    expect(tokens.token, isNull);
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('signing out keeps the food from your own fridge', (
+    tester,
+  ) async {
+    fridges.lists[anna.id] = [fridge(members: 1)];
+    await signOutFromYou(tester);
+
+    expect(find.text('Chicken breasts'), findsOneWidget);
+  }, variant: android);
+
+  testWidgets("signing out forgets the food from someone else's fridge", (
+    tester,
+  ) async {
+    fridges.lists[anna.id] = [fridge(owner: false)];
+    await signOutFromYou(tester);
+
+    expect(find.text('Chicken breasts'), findsNothing);
+    expect(find.text('Nothing in here yet.'), findsOneWidget);
   }, variant: android);
 
   testWidgets('a backend error is shown on the login screen', (tester) async {

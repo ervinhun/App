@@ -6,11 +6,14 @@ import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/food/data/food_store.dart';
+import 'package:app/features/fridges/data/fridges_cache.dart';
+import 'package:app/features/fridges/domain/fridge.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../core/db/test_database.dart';
 import '../../food/food_store_test.dart' show food;
+import '../../fridges/fakes.dart';
 import '../fakes.dart';
 
 void main() {
@@ -18,10 +21,12 @@ void main() {
   late FakeAuthClient api;
   late FakeGoogleAuth google;
   late FakeGuestStorage guests;
+  late FakeFridgesCache fridges;
 
   ProviderContainer container() => ProviderContainer.test(
     overrides: [
       inMemoryDatabase(),
+      fridgesCacheProvider.overrideWithValue(fridges),
       tokenStorageProvider.overrideWithValue(tokens),
       authClientProvider.overrideWithValue(api),
       signInClientProvider.overrideWithValue(api),
@@ -35,20 +40,40 @@ void main() {
     api = FakeAuthClient();
     google = FakeGoogleAuth();
     guests = FakeGuestStorage();
+    fridges = FakeFridgesCache();
   });
 
-  test('when the backend ends the session, the food is forgotten', () async {
-    tokens.token = 'jwt';
-    final c = container();
-    await c.read(authControllerProvider.future);
-    final store = c.read(foodStoreProvider);
-    await store.claimFor(anna.id);
-    await store.save(food('a'), DateTime(2026, 11, 15));
+  group('when the backend ends the session', () {
+    Future<List<String>> foodLeftAfterEndSession() async {
+      tokens.token = 'jwt';
+      final c = container();
+      await c.read(authControllerProvider.future);
+      final store = c.read(foodStoreProvider);
+      await store.claimFor(anna.id);
+      await store.save(food('a'), DateTime(2026, 11, 15));
 
-    await c.read(authControllerProvider.notifier).endSession();
+      await c.read(authControllerProvider.notifier).endSession();
 
-    expect(await store.items(), isEmpty);
-    expect(await store.pendingCount(), 0);
+      return [for (final item in await store.items()) item.id];
+    }
+
+    test("forgets the food from someone else's fridge", () async {
+      fridges.lists[anna.id] = [fridge(owner: false)];
+
+      expect(await foodLeftAfterEndSession(), isEmpty);
+      expect(fridges.lists, isEmpty);
+    });
+
+    test('keeps the food from your own fridge, for a guest', () async {
+      fridges.lists[anna.id] = [fridge(name: 'Flat', members: 1)];
+
+      expect(await foodLeftAfterEndSession(), ['a']);
+      expect(fridges.lists[Fridge.localId]?.single.name, 'Flat');
+    });
+
+    test("forgets the food when it isn't known whose it is", () async {
+      expect(await foodLeftAfterEndSession(), isEmpty);
+    });
   });
 
   group('startup', () {
@@ -191,6 +216,7 @@ void main() {
         retry: (_, _) => null,
         overrides: [
           inMemoryDatabase(),
+          fridgesCacheProvider.overrideWithValue(FakeFridgesCache()),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),

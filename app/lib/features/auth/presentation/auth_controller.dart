@@ -8,6 +8,8 @@ import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/data/food_store.dart';
+import 'package:app/features/fridges/data/fridges_cache.dart';
+import 'package:app/features/fridges/data/fridges_controller.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
@@ -110,18 +112,40 @@ class AuthController extends AsyncNotifier<UserDto?> {
   /// Signs out on this device only, for when the backend already ended the
   /// session. Unlike [signOut] it sends no request, so `AuthInterceptor` can
   /// call it while a refresh is in flight.
-  ///
-  /// Forgets the food on the phone too, however the session ended, so the
-  /// next person to use the phone doesn't see it.
   Future<void> endSession() async {
     final google = ref.read(googleAuthProvider);
-    await ref.read(foodStoreProvider).clear();
-    ref.invalidate(foodItemsProvider);
+    await _tidyUp();
     await _tokens.clear();
     state = const AsyncData(null);
     // Cancels a startup check still running, whose late result would undo this.
     ref.invalidateSelf();
     await google.signOut();
+  }
+
+  /// Keeps the food from the user's own fridge on the phone, for using the
+  /// app offline as a guest; it's theirs again when they sign back in. Food
+  /// from someone else's fridge, or when it isn't known whose it is, is
+  /// forgotten with the fridges, so the next person to use the phone doesn't
+  /// see it.
+  Future<void> _tidyUp() async {
+    final cache = ref.read(fridgesCacheProvider);
+    // The fridges as saved on the phone: the fridges controller depends on
+    // this one, so it can't be read here.
+    final userId = state.value?.id ?? (await _tokens.readUser())?.id;
+    final saved = userId == null ? null : await cache.fridges(userId);
+    final fridge = saved == null
+        ? null
+        : FridgesState(
+            fridges: saved,
+            currentId: await cache.currentId(),
+          ).current;
+    if (saved != null && (fridge == null || fridge.isOwner)) {
+      await keepFridgeForGuest(cache, fridge);
+    } else {
+      await ref.read(foodStoreProvider).clear();
+      await cache.clear();
+      ref.invalidate(foodItemsProvider);
+    }
   }
 
   Future<void> _start(AuthResponse session) async {
