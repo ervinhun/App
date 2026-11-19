@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -33,11 +34,18 @@ class TokenStorage {
     await _storage.write(key: _accessTokenKey, value: accessToken);
   }
 
-  /// The user the tokens belong to, as the backend last returned them.
+  /// The user the tokens belong to, as the backend last returned them. Null
+  /// if what's saved can't be read, e.g. from an older app version: the
+  /// next check with the backend saves them again.
   Future<UserDto?> readUser() async {
     final json = await _storage.read(key: _userKey);
     if (json == null) return null;
-    return UserDto.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    try {
+      return UserDto.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('Could not read the saved user: $e');
+      return null;
+    }
   }
 
   Future<void> writeUser(UserDto user) =>
