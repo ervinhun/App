@@ -66,11 +66,40 @@ void main() {
   test(
     'removing an item the backend never had leaves nothing to send',
     () async {
-      await store.save(food('a'), t1);
-      await store.delete('a', t2);
+      await store.seedOnce([food('a')]);
+      await store.delete('a', t1);
 
       expect(await store.item('a'), isNull);
       expect(await store.pendingCount(), 0);
+    },
+  );
+
+  test('removing an item whose save is queued sends the removal', () async {
+    await store.save(food('a'), t1);
+    await store.delete('a', t2);
+
+    expect(await store.item('a'), isNull);
+    final change = (await store.nextChange())!;
+    expect((change.itemId, change.kind), ('a', ChangeKind.delete));
+    expect(await store.pendingCount(), 1);
+  });
+
+  test(
+    'removing an item while its save is on its way still removes it',
+    () async {
+      await store.save(food('a'), t1);
+      final sent = (await store.nextChange())!;
+      await store.delete('a', t2);
+
+      // The backend accepts the save sent before the removal.
+      await store.completeChange(sent, serverItem: food('a'));
+
+      // The backend has it now, but the pull doesn't bring it back: its
+      // removal is still to be sent.
+      await store.applyServerItems([food('a')]);
+      expect(await store.item('a'), isNull);
+      final change = (await store.nextChange())!;
+      expect((change.itemId, change.kind), ('a', ChangeKind.delete));
     },
   );
 

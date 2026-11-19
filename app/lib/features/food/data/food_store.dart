@@ -46,18 +46,22 @@ class FoodStore {
         await _queue(item.id, ChangeKind.save, changedAt);
       });
 
-  /// Removes the item, and queues the removal if the backend has it.
+  /// Removes the item, and queues the removal if the backend has it or may
+  /// be getting it: a queued save may already be on its way, and would bring
+  /// the item back if its removal weren't sent after it. Removing an item the
+  /// backend never got succeeds, so the removal is harmless otherwise.
   Future<void> delete(String id, DateTime changedAt) =>
       _db.transaction(() async {
         final row = await (_db.select(
           _db.foodItems,
         )..where((t) => t.id.equals(id))).getSingleOrNull();
+        final queued = await (_db.select(
+          _db.pendingChanges,
+        )..where((t) => t.itemId.equals(id))).getSingleOrNull();
         await (_db.delete(_db.foodItems)..where((t) => t.id.equals(id))).go();
-        if (row?.onServer ?? false) {
+        // Otherwise it never reached the backend: nothing to tell it.
+        if ((row?.onServer ?? false) || queued != null) {
           await _queue(id, ChangeKind.delete, changedAt);
-        } else {
-          // Never reached the backend: nothing to tell it.
-          await _unqueue(id);
         }
       });
 
@@ -78,10 +82,6 @@ class FoodStore {
           target: [_db.pendingChanges.itemId],
         ),
       );
-
-  Future<void> _unqueue(String itemId) => (_db.delete(
-    _db.pendingChanges,
-  )..where((t) => t.itemId.equals(itemId))).go();
 
   /// The oldest change still to send.
   Future<PendingChange?> nextChange() =>
