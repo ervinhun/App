@@ -24,7 +24,9 @@ abstract final class AppColors {
   static const categoryProduce = Color(0xFFEAF5EC);
   static const categoryEggs = Color(0xFFE8F5F0);
 
-  /// The ink colour ([textPrimary]) at 8%, 10%, 19% and 25% opacity.
+  /// The ink colour ([textPrimary]) at 5%, 6%, 8%, 10%, 19% and 25% opacity.
+  static const shadowInk5 = Color(0x0D0D4F6B);
+  static const shadowInk6 = Color(0x0F0D4F6B);
   static const shadowInk8 = Color(0x140D4F6B);
   static const shadowInk10 = Color(0x1A0D4F6B);
   static const shadowInk19 = Color(0x300D4F6B);

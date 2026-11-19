@@ -11,7 +11,10 @@ import 'package:app/features/auth/presentation/startup_error_screen.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/presentation/add_food_screen.dart';
-import 'package:app/features/fridges/presentation/fridges_screen.dart';
+import 'package:app/features/fridges/presentation/activity_log_screen.dart';
+import 'package:app/features/fridges/presentation/alert_settings_screen.dart';
+import 'package:app/features/fridges/presentation/expiry_defaults_screen.dart';
+import 'package:app/features/fridges/presentation/management_screen.dart';
 import 'package:app/features/profile/presentation/profile_screen.dart';
 
 abstract final class Routes {
@@ -20,6 +23,9 @@ abstract final class Routes {
   static const startupError = '/startup-error';
   static const home = '/';
   static const management = '/management';
+  static const expiryDefaults = '/management/expiry-defaults';
+  static const alertSettings = '/management/alerts';
+  static const activityLog = '/management/activity';
   static const you = '/you';
 
   /// Takes `?storage=fridge|freezer|pantry` for where it goes by default.
@@ -91,7 +97,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.management,
-                builder: (_, _) => const FridgesScreen(),
+                builder: (_, _) => const ManagementScreen(),
+                // In the tab, under the navigation bar; Back returns to it.
+                routes: [
+                  GoRoute(
+                    path: 'expiry-defaults',
+                    builder: (_, _) => const ExpiryDefaultsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'alerts',
+                    builder: (_, _) => const AlertSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'activity',
+                    builder: (_, _) => const ActivityLogScreen(),
+                  ),
+                ],
               ),
             ],
           ),

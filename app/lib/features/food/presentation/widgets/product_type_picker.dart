@@ -6,6 +6,7 @@ import 'package:app/core/api/api_client.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/dashboard/presentation/widgets/food_card.dart';
+import 'package:app/features/food/data/expiry_defaults_controller.dart';
 import 'package:app/features/food/data/product_catalog_api.dart';
 import 'package:app/features/food/domain/food_icons.dart';
 import 'package:app/features/food/domain/food_item.dart';
@@ -96,7 +97,7 @@ class _ProductTypePickerState extends ConsumerState<_ProductTypePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final types = ref.watch(productTypesProvider);
+    final types = ref.watch(adjustedProductTypesProvider);
     final category = _category;
     // Back steps out of a category before it closes the sheet.
     return PopScope(

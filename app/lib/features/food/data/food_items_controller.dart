@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/core/utils/ids.dart';
+import 'package:app/features/food/data/expiry_defaults_controller.dart';
 import 'package:app/features/food/data/food_store.dart';
 import 'package:app/features/food/data/sample_food.dart';
+import 'package:app/features/food/domain/expiry_defaults.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
 /// The food in the current fridge, as the user changes it: loading until the
@@ -43,7 +45,18 @@ class FoodItemsController extends AsyncNotifier<List<FoodItem>> {
   /// Marks the item opened today, and returns it as it was before.
   FoodItem markOpened(String id, DateTime today) {
     final before = _items.firstWhere((item) => item.id == id);
-    replace(before.opened(today));
+    final defaults =
+        ref.read(expiryDefaultsProvider).value ?? ExpiryDefaults.none;
+    replace(
+      before.opened(
+        today,
+        shelfLifeDays: defaults.openedDays(
+          before.storage,
+          category: before.productCategory,
+          type: before.productType,
+        ),
+      ),
+    );
     return before;
   }
 

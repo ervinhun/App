@@ -15,7 +15,8 @@ class HomeShell extends StatelessWidget {
   // In branch order: see the StatefulShellRoute in app_router.dart.
   static const _destinations = [
     (icon: LucideIcons.refrigerator, label: 'My food'),
-    (icon: LucideIcons.shoppingBasket, label: 'Management'),
+    // The crew: the tab is about who shares the fridge, and its rules.
+    (icon: LucideIcons.usersRound, label: 'Management'),
     (icon: LucideIcons.userRound, label: 'You'),
   ];
 

@@ -96,15 +96,12 @@ class FoodItem {
   int daysLeft(DateTime today) =>
       _dateOnly(expiresOn).difference(_dateOnly(today)).inDays;
 
-  /// This item, opened [today]: it now has to be eaten within its category's
-  /// shelf life once open, or by its printed date if that comes first.
-  FoodItem opened(DateTime today) {
+  /// This item, opened [today]: it now has to be eaten within
+  /// [shelfLifeDays] (see `ExpiryDefaults.openedDays`), or by its printed
+  /// date if that comes first.
+  FoodItem opened(DateTime today, {required int shelfLifeDays}) {
     final day = DateTime(today.year, today.month, today.day);
-    final eatBy = DateTime(
-      day.year,
-      day.month,
-      day.day + _openedShelfLifeDays[category]!,
-    );
+    final eatBy = DateTime(day.year, day.month, day.day + shelfLifeDays);
     return FoodItem(
       id: id,
       name: name,
@@ -118,17 +115,6 @@ class FoodItem {
       openedExpiresOn: eatBy.isBefore(bestBefore) ? eatBy : bestBefore,
     );
   }
-
-  // TODO: replace with the user's Expiry Defaults (Figma node 117:194) once
-  // that screen exists.
-  static const _openedShelfLifeDays = {
-    FoodCategory.meat: 2,
-    FoodCategory.fish: 1,
-    FoodCategory.dairy: 4,
-    FoodCategory.veg: 3,
-    FoodCategory.eggs: 7,
-    FoodCategory.other: 5,
-  };
 
   ExpiryUrgency urgency(DateTime today) => switch (daysLeft(today)) {
     <= 2 => ExpiryUrgency.soon,

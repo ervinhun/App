@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/core/widgets/brand_logo.dart';
 
 /// The logo, fridge switcher and notifications, then the greeting and title.
 class DashboardHeader extends StatelessWidget {
@@ -39,7 +39,7 @@ class DashboardHeader extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: _Brand(),
+                child: BrandLogo(),
               ),
             ),
             const SizedBox(width: 8),
@@ -66,42 +66,6 @@ class DashboardHeader extends StatelessWidget {
       ],
     );
   }
-}
-
-class _Brand extends StatelessWidget {
-  const _Brand();
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      SizedBox.square(
-        dimension: 34,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 3.67, top: 3.67),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: SvgPicture.asset(
-              'assets/images/logo_mark.svg',
-              width: 26.66,
-              height: 27.12,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 7),
-      Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(text: 'Fridge', style: AppText.brand(Colors.black)),
-            TextSpan(
-              text: 'Friend',
-              style: AppText.brand(AppColors.brandPrimary),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
 }
 
 class _FridgeSwitcher extends StatelessWidget {
