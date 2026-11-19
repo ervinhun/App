@@ -85,7 +85,9 @@ void main() {
 
   FoodItemsController foodNotifier() => c.read(foodItemsProvider.notifier);
   SyncStatus status() => c.read(syncControllerProvider);
-  Set<String> names() => {for (final i in c.read(foodItemsProvider)) i.name};
+  Set<String> names() => {
+    for (final i in c.read(foodItemsProvider).requireValue) i.name,
+  };
 
   /// Lets the saves and the sync they start finish.
   Future<void> settle() async {
@@ -130,7 +132,7 @@ void main() {
       expect(status().pending, 2);
       expect(status().reachable, isFalse);
       // Still shown, opened, while offline.
-      expect(c.read(foodItemsProvider).first.isOpened, isTrue);
+      expect(c.read(foodItemsProvider).requireValue.first.isOpened, isTrue);
       expect(opened.isOpened, isFalse);
 
       remote.offline = false;

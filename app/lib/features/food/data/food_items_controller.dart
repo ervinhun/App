@@ -9,56 +9,57 @@ import 'package:app/features/food/data/food_store.dart';
 import 'package:app/features/food/data/sample_food.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
-/// The food in the current fridge, as the user changes it.
+/// The food in the current fridge, as the user changes it: loading until the
+/// device's copy has been read.
 ///
 /// Changes show at once and are saved on the device ([FoodStore]), so they
 /// work offline; the sync controller sends them to the backend when it can.
 /// Each change returns what it replaced, so the screen can offer Undo.
-class FoodItemsController extends Notifier<List<FoodItem>> {
+class FoodItemsController extends AsyncNotifier<List<FoodItem>> {
   FoodStore get _store => ref.read(foodStoreProvider);
 
   @override
-  List<FoodItem> build() {
-    unawaited(_load(ref.watch(initialFoodProvider)));
-    return const [];
+  Future<List<FoodItem>> build() async {
+    await _store.seedOnce(ref.watch(initialFoodProvider));
+    return _store.items();
   }
 
-  Future<void> _load(List<FoodItem> seed) async {
-    await _store.seedOnce(seed);
-    await reload();
-  }
+  /// The food as shown; empty while it loads.
+  List<FoodItem> get _items => state.value ?? const [];
+
+  set _items(List<FoodItem> items) => state = AsyncData(items);
 
   /// Shows what the device has, after the sync controller changed it.
   Future<void> reload() async {
     final items = await _store.items();
-    if (ref.mounted) state = items;
+    if (ref.mounted) _items = items;
   }
 
   void add(FoodItem item) {
-    state = [...state, item];
+    _items = [..._items, item];
     _save(item);
   }
 
   /// Marks the item opened today, and returns it as it was before.
   FoodItem markOpened(String id, DateTime today) {
-    final before = state.firstWhere((item) => item.id == id);
+    final before = _items.firstWhere((item) => item.id == id);
     replace(before.opened(today));
     return before;
   }
 
   /// Puts [item] in place of the item with the same id.
   void replace(FoodItem item) {
-    state = [
-      for (final existing in state) existing.id == item.id ? item : existing,
+    _items = [
+      for (final existing in _items) existing.id == item.id ? item : existing,
     ];
     _save(item);
   }
 
   /// Takes the item out, and returns it with where it was, for [restore].
   (FoodItem, int) remove(String id) {
-    final index = state.indexWhere((item) => item.id == id);
-    final item = state[index];
-    state = [...state]..removeAt(index);
+    final index = _items.indexWhere((item) => item.id == id);
+    final item = _items[index];
+    _items = [..._items]..removeAt(index);
     _persist(_store.delete(id, DateTime.now()));
     return (item, index);
   }
@@ -67,7 +68,7 @@ class FoodItemsController extends Notifier<List<FoodItem>> {
   /// already have reached the backend, where removal wins over a change.
   void restore(FoodItem item, int index) {
     final copy = item.withId(newId());
-    state = [...state]..insert(index.clamp(0, state.length), copy);
+    _items = [..._items]..insert(index.clamp(0, _items.length), copy);
     _save(copy);
   }
 
@@ -84,6 +85,7 @@ class FoodItemsController extends Notifier<List<FoodItem>> {
   );
 }
 
-final foodItemsProvider = NotifierProvider<FoodItemsController, List<FoodItem>>(
-  FoodItemsController.new,
-);
+final foodItemsProvider =
+    AsyncNotifierProvider<FoodItemsController, List<FoodItem>>(
+      FoodItemsController.new,
+    );

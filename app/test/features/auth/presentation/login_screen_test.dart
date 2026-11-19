@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/db/test_database.dart';
 import '../fakes.dart';
 
 void main() {
@@ -21,6 +22,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(FakeTokenStorage()),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),

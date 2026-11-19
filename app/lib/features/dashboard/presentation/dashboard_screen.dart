@@ -9,6 +9,7 @@ import 'package:app/core/router/app_router.dart';
 import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/core/widgets/loading_screen.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/dashboard/presentation/widgets/dashboard_header.dart';
 import 'package:app/features/dashboard/presentation/widgets/food_filters.dart';
@@ -67,6 +68,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final before = _food.markOpened(item.id, today);
     final eatBy = ref
         .read(foodItemsProvider)
+        .requireValue
         .firstWhere((i) => i.id == item.id)
         .expiresOn;
     _showUndo(
@@ -99,7 +101,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
-    final items = ref.watch(foodItemsProvider);
+    final food = ref.watch(foodItemsProvider);
     final user = ref.watch(authControllerProvider).value;
     final showSwipeHint = ref.watch(swipeHintProvider).value ?? false;
     final firstName = user?.displayName.trim().split(' ').first ?? '';
@@ -113,6 +115,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         );
       }
     });
+
+    // Until the food on the phone has been read, rather than an empty list.
+    if (!food.hasValue && !food.hasError) return const LoadingScreen();
+    final items = food.value ?? const <FoodItem>[];
 
     final inStorage = [
       for (final item in items)

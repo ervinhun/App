@@ -2,6 +2,7 @@ import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/core/sync/connectivity.dart';
 import 'package:app/core/api/api_client.dart';
+import 'package:app/core/widgets/loading_screen.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:app/features/food/data/sample_food.dart';
@@ -100,6 +101,19 @@ void main() {
   // The expiry sticker on opened food, e.g. "8 Nov → 4 Nov".
   final stickers = find.textContaining('→');
   final tip = find.textContaining('swipe a card', findRichText: true);
+
+  testWidgets('shows the loading screen until the food is read', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, settle: false);
+
+    expect(find.byType(LoadingScreen), findsOneWidget);
+    expect(find.text('Nothing in here yet.'), findsNothing);
+
+    await tester.pumpAndSettle();
+    expect(find.byType(LoadingScreen), findsNothing);
+    expect(find.text('Chicken breasts'), findsOneWidget);
+  });
 
   testWidgets('offline, says changes still count', (tester) async {
     await pumpDashboard(tester, online: false);

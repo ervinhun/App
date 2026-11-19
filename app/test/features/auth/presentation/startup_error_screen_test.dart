@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/db/test_database.dart';
 import '../fakes.dart';
 
 const _offlineMessage = "Can't reach the server.";
@@ -31,6 +32,7 @@ void main() {
       ProviderScope(
         retry: autoRetry ? null : (_, _) => null,
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),

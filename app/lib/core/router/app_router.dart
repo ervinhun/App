@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:app/core/router/home_shell.dart';
+import 'package:app/core/widgets/loading_screen.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/auth/presentation/login_screen.dart';
@@ -59,11 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           : null;
     },
     routes: [
-      GoRoute(
-        path: Routes.splash,
-        builder: (_, _) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
-      ),
+      GoRoute(path: Routes.splash, builder: (_, _) => const LoadingScreen()),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: Routes.startupError,
