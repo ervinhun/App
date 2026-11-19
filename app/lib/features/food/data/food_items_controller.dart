@@ -79,8 +79,18 @@ class FoodItemsController extends AsyncNotifier<List<FoodItem>> {
       (_) {
         if (ref.mounted) ref.read(syncControllerProvider.notifier).changed();
       },
-      onError: (Object e, StackTrace stackTrace) =>
-          debugPrint('Could not save a food change: $e\n$stackTrace'),
+      onError: (Object e, StackTrace stackTrace) {
+        debugPrint('Could not save a food change: $e\n$stackTrace');
+        // The change shows but wasn't saved, so it would vanish on restart:
+        // show what the phone has instead.
+        if (!ref.mounted) return;
+        unawaited(
+          reload().then(
+            (_) {},
+            onError: (Object e) => debugPrint('Could not reload the food: $e'),
+          ),
+        );
+      },
     ),
   );
 }
