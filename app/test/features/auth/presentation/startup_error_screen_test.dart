@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes.dart';
+import '../../fridges/fakes.dart';
 
 const _offlineMessage = "Can't reach the server.";
 
@@ -35,6 +36,7 @@ void main() {
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
+          ...fridgeOverrides(),
         ],
         child: const FridgeFriendApp(),
       ),
@@ -67,7 +69,7 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
     await pumpABit(tester);
 
-    expect(find.text('First dibs'), findsOneWidget);
+    expect(find.text('Add manual'), findsOneWidget);
   });
 
   group('Try again', () {
@@ -78,7 +80,7 @@ void main() {
       await tester.tap(find.text('Try again'));
       await pumpABit(tester);
 
-      expect(find.text('First dibs'), findsOneWidget);
+      expect(find.text('Add manual'), findsOneWidget);
     });
 
     testWidgets('comes back here if it fails again', (tester) async {

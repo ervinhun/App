@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,11 +12,15 @@ import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/dashboard/presentation/widgets/dashboard_header.dart';
+import 'package:app/features/dashboard/presentation/widgets/food_details_sheet.dart';
 import 'package:app/features/dashboard/presentation/widgets/food_filters.dart';
 import 'package:app/features/dashboard/presentation/widgets/swipe_hint_banner.dart';
 import 'package:app/features/dashboard/presentation/widgets/swipeable_food_card.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/domain/food_item.dart';
+import 'package:app/features/fridges/data/fridge_spaces_controller.dart';
+import 'package:app/features/fridges/domain/fridge_space.dart';
+import 'package:app/features/fridges/presentation/fridge_space_sheets.dart';
 
 /// The "My food" tab: what's in the current fridge, soonest to expire first.
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -43,7 +49,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (filter != null && filter != old.initialFilter) _filter = filter;
   }
 
-  FoodItemsController get _food => ref.read(foodItemsProvider.notifier);
+  // Redraws every minute, so "days left" is right after midnight too.
+  late final Timer _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _clock.cancel();
+    super.dispose();
+  }
+
+  String get _spaceId =>
+      ref.read(fridgeSpacesProvider).requireValue.current!.id;
+
+  FoodItemsController get _food =>
+      ref.read(spaceFoodProvider(_spaceId).notifier);
 
   // Until these features exist, their buttons say so instead of doing nothing.
   void _notYet(String feature) =>
@@ -74,7 +99,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _markOpened(FoodItem item, DateTime today) {
     final before = _food.markOpened(item.id, today);
     final eatBy = ref
-        .read(foodItemsProvider)
+        .read(spaceFoodProvider(_spaceId))
         .firstWhere((i) => i.id == item.id)
         .expiresOn;
     _showUndo(
@@ -104,10 +129,46 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _showUndo('${item.name} removed', () => _food.restore(removed, index));
   }
 
+  void _details(FoodItem item, DateTime today) => showFoodDetails(
+    context,
+    item: item,
+    today: today,
+    moveTo: [
+      for (final s
+          in ref.read(fridgeSpacesProvider).requireValue.current!.storages)
+        if (s != item.storage) s,
+    ],
+    onOpened: item.isOpened ? null : () => _markOpened(item, today),
+    onMoved: (to) {
+      _food.replace(item.movedTo(to));
+      _showUndo('${item.name} moved to ${to.label}', () => _food.replace(item));
+    },
+    onRemoved: () => _remove(item),
+  );
+
+  void _removeAll(List<FoodItem> items) {
+    final before = _food.removeWhere(items.contains);
+    _showUndo('${items.length} removed', () => _food.undoTo(before));
+  }
+
+  Future<void> _switchSpace() async {
+    _messenger.currentState!.hideCurrentSnackBar(); // Its Undo is for this one.
+    final added = await showFridgeSpaceSwitcher(context);
+    if (added != null) _showSnackBar(Text('Switched to ${added.name}'));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final space = ref.watch(fridgeSpacesProvider).value?.current;
+    if (space == null) return const NoFridgeSpace();
+    if (!space.storages.contains(_storage) && space.storages.isNotEmpty) {
+      _storage = space.storages.first;
+    }
+    final thresholds =
+        ref.watch(expiryThresholdsProvider(space.id)).value ??
+        defaultThresholds;
     final today = DateTime.now();
-    final items = ref.watch(foodItemsProvider);
+    final items = ref.watch(spaceFoodProvider(space.id));
     final user = ref.watch(authControllerProvider).value;
     final showSwipeHint = ref.watch(swipeHintProvider).value ?? false;
     final firstName = user?.displayName.trim().split(' ').first ?? '';
@@ -119,23 +180,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final query = _query.trim().toLowerCase();
     final visible = [
       for (final item in inStorage)
-        if (_filter.matches(item, today) &&
-            item.name.toLowerCase().contains(query))
+        if (_filter.matches(item, today, thresholds) &&
+            '${item.name}\n${item.productType}'.toLowerCase().contains(query))
           item,
     ]..sort((a, b) => a.expiresOn.compareTo(b.expiresOn));
+    // "Soon" is within the space's expiry warning, as its notifications.
+    final expired = [...visible.where((i) => i.isExpired(today))];
     final soon = [
       for (final item in visible)
-        if (item.urgency(today) == ExpiryUrgency.soon) item,
+        if (!item.isExpired(today) &&
+            item.urgency(today, thresholds) != ExpiryUrgency.later)
+          item,
     ];
     final later = [
       for (final item in visible)
-        if (item.urgency(today) != ExpiryUrgency.soon) item,
+        if (item.urgency(today, thresholds) == ExpiryUrgency.later) item,
     ];
 
     // Nudge the top card once, while the user hasn't swiped yet.
     String? peekId;
     if (showSwipeHint && !_peeked && visible.isNotEmpty) {
-      peekId = (soon.isNotEmpty ? soon : later).first.id;
+      peekId = visible.first.id;
       _peeked = true;
     }
 
@@ -144,10 +209,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Scaffold(
         backgroundColor: AppColors.canvas,
         // Always in reach, while the list scrolls behind.
-        bottomNavigationBar: _AddFoodButtons(
-          onScan: () => _notYet('Scanning'),
-          onAddManual: _addManually,
-        ),
+        bottomNavigationBar: !space.canPut || space.storages.isEmpty
+            ? null
+            : _AddFoodButtons(
+                onScan: () => _notYet('Scanning'),
+                onAddManual: _addManually,
+              ),
         body: AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle.dark,
           child: SafeArea(
@@ -156,11 +223,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(22, 10, 22, 20),
               children: [
                 DashboardHeader(
-                  fridgeName: 'Home',
+                  fridgeName: space.name,
                   userName: firstName.isEmpty ? 'there' : firstName,
                   today: today,
-                  hasUnread: true,
-                  onSwitchFridge: () => _notYet('Switching fridges'),
+                  hasUnread: false, // No notifications exist yet.
+                  onSwitchFridge: _switchSpace,
                   onNotifications: () => _notYet('Notifications'),
                 ),
                 const SizedBox(height: 18),
@@ -173,7 +240,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   counts: {
                     FoodFilter.all: inStorage.length,
                     FoodFilter.expiring: inStorage
-                        .where((i) => FoodFilter.expiring.matches(i, today))
+                        .where(
+                          (i) =>
+                              FoodFilter.expiring.matches(i, today, thresholds),
+                        )
                         .length,
                   },
                   view: _view,
@@ -183,6 +253,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 const SizedBox(height: 18),
                 StorageTabs(
+                  storages: space.storages,
+                  labelFor: space.labelFor,
                   selected: _storage,
                   counts: {
                     for (final location in StorageLocation.values)
@@ -193,15 +265,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   onSelected: (storage) => setState(() => _storage = storage),
                 ),
                 const SizedBox(height: 18),
-                Text(
-                  'First dibs',
-                  style: AppText.nunito(
-                    20,
-                    FontWeight.w800,
-                    AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 if (showSwipeHint && visible.isNotEmpty) ...[
                   SwipeHintBanner(
                     onClose: () => ref.read(swipeHintProvider.notifier).done(),
@@ -223,17 +286,47 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                     ),
                   ),
-                for (final (i, group) in [
-                  soon,
-                  later,
-                ].where((g) => g.isNotEmpty).indexed) ...[
+                if (inStorage.isEmpty && space.canPut)
+                  _AddButton(
+                    label: 'Add food here',
+                    icon: LucideIcons.plus,
+                    filled: false,
+                    onTap: _addManually,
+                  ),
+                for (final (i, (title, group)) in [
+                  ('Expired', expired),
+                  ('First dibs', soon),
+                  ('Fine for a while', later),
+                ].where((g) => g.$2.isNotEmpty).indexed) ...[
                   if (i > 0) const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: AppText.nunito(
+                            20,
+                            FontWeight.w800,
+                            AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (group == expired && space.canPut)
+                        TextButton(
+                          onPressed: () => _removeAll(expired),
+                          child: const Text('Remove all'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   _FoodGroup(
                     items: group,
                     today: today,
+                    thresholds: thresholds,
                     view: _view,
                     peekId: peekId,
                     onOpened: (item) => _markOpened(item, today),
+                    onTapped: (item) => _details(item, today),
                     onRemoved: _remove,
                     onSwiped: () => ref.read(swipeHintProvider.notifier).done(),
                   ),
@@ -251,20 +344,24 @@ class _FoodGroup extends StatelessWidget {
   const _FoodGroup({
     required this.items,
     required this.today,
+    required this.thresholds,
     required this.view,
     required this.peekId,
     required this.onOpened,
+    required this.onTapped,
     required this.onRemoved,
     required this.onSwiped,
   });
 
   final List<FoodItem> items;
   final DateTime today;
+  final ExpiryThresholds thresholds;
   final FoodView view;
 
   /// The card that nudges to teach swiping, if any.
   final String? peekId;
   final ValueChanged<FoodItem> onOpened;
+  final ValueChanged<FoodItem> onTapped;
   final ValueChanged<FoodItem> onRemoved;
   final VoidCallback onSwiped;
 
@@ -274,9 +371,11 @@ class _FoodGroup extends StatelessWidget {
       key: ValueKey(item.id),
       item: item,
       today: today,
+      thresholds: thresholds,
       compact: view == FoodView.grid,
       peek: item.id == peekId,
       onOpened: () => onOpened(item),
+      onTap: () => onTapped(item),
       onRemoved: () => onRemoved(item),
       onSwiped: onSwiped,
     );

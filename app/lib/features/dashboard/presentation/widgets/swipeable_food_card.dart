@@ -23,10 +23,14 @@ class SwipeableFoodCard extends StatefulWidget {
     this.onSwiped,
     this.compact = false,
     this.peek = false,
+    this.thresholds = defaultThresholds,
+    this.onTap,
   });
 
   final FoodItem item;
   final DateTime today;
+  final ExpiryThresholds thresholds;
+  final VoidCallback? onTap;
 
   /// Marks the item opened. Never called for items that already are.
   final VoidCallback onOpened;
@@ -136,6 +140,7 @@ class _SwipeableFoodCardState extends State<SwipeableFoodCard>
       today: widget.today,
       compact: widget.compact,
       showStatusEdge: atRest,
+      thresholds: widget.thresholds,
     );
 
     // One rounded outline for the card and what's behind it: the card's
@@ -185,7 +190,12 @@ class _SwipeableFoodCardState extends State<SwipeableFoodCard>
               animation: _peekOffset,
               builder: (context, _) {
                 final dx = _peekOffset.value;
-                if (dx == 0) return card(atRest: !_moving);
+                if (dx == 0) {
+                  return GestureDetector(
+                    onTap: widget.onTap,
+                    child: card(atRest: !_moving),
+                  );
+                }
                 return Stack(
                   children: [
                     Positioned.fill(
