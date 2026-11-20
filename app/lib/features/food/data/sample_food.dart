@@ -80,6 +80,17 @@ List<FoodItem> sampleFood(DateTime today) {
       storage: StorageLocation.fridge,
       bestBefore: day(11),
     ),
+    // Already past it, for the Expired section.
+    FoodItem(
+      id: 'ham',
+      name: 'Sliced ham',
+      amount: '150 g',
+      category: FoodCategory.meat,
+      productCategory: 'Deli & Leftovers',
+      productType: 'Ham (pre-packaged, luncheon/deli meat)',
+      storage: StorageLocation.fridge,
+      bestBefore: day(-2),
+    ),
     for (final (name, amount, category, productCategory, productType, days) in [
       ('Frozen peas', '900 g', FoodCategory.veg, 'Frozen', 'Vegetables', 120),
       (

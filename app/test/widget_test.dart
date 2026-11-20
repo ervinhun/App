@@ -15,6 +15,7 @@ import 'package:app/features/notifications/data/reminders_storage.dart';
 import 'core/storage/fake_hint_storage.dart';
 import 'features/notifications/fakes.dart';
 import 'features/auth/fakes.dart';
+import 'features/fridges/fakes.dart';
 
 void main() {
   late FakeTokenStorage tokens;
@@ -37,6 +38,7 @@ void main() {
           notificationApiProvider.overrideWithValue(
             FakeNotificationApi(fails: true),
           ),
+          ...fridgeOverrides(),
         ],
         child: const FridgeFriendApp(),
       ),
@@ -64,7 +66,7 @@ void main() {
     tokens.token = 'jwt';
     await pumpApp(tester);
 
-    expect(find.text('First dibs'), findsOneWidget);
+    expect(find.text('Add manual'), findsOneWidget);
     expect(find.textContaining('HELLO, ANNA!'), findsOneWidget);
   }, variant: android);
 
@@ -75,7 +77,7 @@ void main() {
 
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
-    expect(find.text('First dibs'), findsOneWidget);
+    expect(find.text('Add manual'), findsOneWidget);
 
     await tester.tap(find.text('You'));
     await tester.pumpAndSettle();

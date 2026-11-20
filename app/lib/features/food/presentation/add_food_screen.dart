@@ -11,6 +11,7 @@ import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/domain/product_type.dart';
 import 'package:app/features/food/presentation/widgets/product_type_picker.dart';
+import 'package:app/features/fridges/data/fridge_spaces_controller.dart';
 
 /// "Add manual": type in something that wasn't scanned.
 ///
@@ -29,7 +30,11 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _amount = TextEditingController();
-  late StorageLocation _storage = widget.storage;
+  // The fridge space on the Dashboard: only storage it has can be picked.
+  late final _space = ref.read(fridgeSpacesProvider).requireValue.current!;
+  late StorageLocation _storage = _space.storages.contains(widget.storage)
+      ? widget.storage
+      : _space.storages.first;
   ProductType? _type;
   DateTime? _bestBefore;
 
@@ -139,7 +144,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
       // The backend dates additions in UTC, so this does too.
       addedOn: DateTime.now().toUtc(),
     );
-    ref.read(foodItemsProvider.notifier).add(item);
+    ref.read(spaceFoodProvider(_space.id).notifier).add(item);
     context.pop(item);
   }
 
@@ -182,6 +187,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
                     _Field(
                       label: 'Where does it go?',
                       child: _StorageChoices(
+                        storages: _space.storages,
                         selected: _storage,
                         onSelected: _changeStorage,
                       ),
@@ -486,8 +492,13 @@ class _TextInput extends StatelessWidget {
 
 /// Fridge / Freezer / Pantry pills, as on the Expiry Defaults screen.
 class _StorageChoices extends StatelessWidget {
-  const _StorageChoices({required this.selected, required this.onSelected});
+  const _StorageChoices({
+    required this.storages,
+    required this.selected,
+    required this.onSelected,
+  });
 
+  final List<StorageLocation> storages;
   final StorageLocation selected;
   final ValueChanged<StorageLocation> onSelected;
 
@@ -499,7 +510,7 @@ class _StorageChoices extends StatelessWidget {
         (StorageLocation.fridge, 'Fridge'),
         (StorageLocation.freezer, 'Freezer'),
         (StorageLocation.pantry, 'Pantry'),
-      ])
+      ].where((s) => storages.contains(s.$1)))
         Expanded(
           child: Semantics(
             selected: storage == selected,

@@ -20,10 +20,12 @@ class FoodCard extends StatelessWidget {
     required this.today,
     this.compact = false,
     this.showStatusEdge = true,
+    this.thresholds = defaultThresholds,
   });
 
   final FoodItem item;
   final DateTime today;
+  final ExpiryThresholds thresholds;
   final bool compact;
 
   /// Fades the urgency-coloured edge out, keeping its space, e.g. while the
@@ -32,7 +34,7 @@ class FoodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urgency = item.urgency(today);
+    final urgency = item.urgency(today, thresholds);
     final statusColor = urgencyColor(urgency);
     final background = categoryColor(item.category);
     return AnimatedContainer(

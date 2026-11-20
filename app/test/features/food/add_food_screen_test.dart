@@ -17,6 +17,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/storage/fake_hint_storage.dart';
 import '../auth/fakes.dart';
+import '../fridges/fakes.dart';
 
 const types = [
   ProductType(
@@ -86,6 +87,7 @@ void main() {
             FakeHintStorage(swipeDone: true),
           ),
           initialFoodProvider.overrideWithValue(const []),
+          ...fridgeOverrides(),
           productTypesProvider.overrideWith(
             (ref) => loadTypes?.call() ?? Future.value(types),
           ),
@@ -166,8 +168,8 @@ void main() {
     await tester.tap(find.text('Add to pantry'));
     await tester.pumpAndSettle();
 
-    // Back on the Dashboard, on the Pantry tab.
-    expect(find.text('First dibs'), findsOneWidget);
+    // Back on the Dashboard, on the Pantry tab: a week to go is fine.
+    expect(find.text('Fine for a while'), findsOneWidget);
     expect(find.text('Oat milk'), findsOneWidget);
     expect(find.text('1 litre · Unopened'), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
