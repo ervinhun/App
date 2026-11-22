@@ -24,7 +24,7 @@ abstract class AuthClient {
   @POST('/api/Auth/Login')
   Future<AuthResponse> login({@Body() required LoginRequest body});
 
-  @POST('/api/Auth/External')
+  @POST('/api/Auth/ExternalLogin')
   Future<AuthResponse> externalLogin({
     @Body() required ExternalLoginRequest body,
   });

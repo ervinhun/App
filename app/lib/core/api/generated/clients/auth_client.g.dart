@@ -89,7 +89,7 @@ class _AuthClient implements AuthClient {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            '/api/Auth/External',
+            '/api/Auth/ExternalLogin',
             queryParameters: queryParameters,
             data: _data,
           )

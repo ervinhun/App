@@ -10,7 +10,15 @@ import 'package:app/core/api/generated/export.dart';
 /// keystore, with the signed-in user so the app can start offline.
 class TokenStorage {
   TokenStorage([FlutterSecureStorage? storage])
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          // Readable after the first unlock, so a background task can use the
+          // tokens while the phone is locked.
+          const FlutterSecureStorage(
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+            ),
+          );
 
   static const _accessTokenKey = 'access_token';
   static const _refreshTokenKey = 'refresh_token';
@@ -50,6 +58,17 @@ class TokenStorage {
 
   Future<void> writeUser(UserDto user) =>
       _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
+
+  /// Re-saves tokens stored under the iOS default (readable only while
+  /// unlocked) with the first-unlock setting. Does nothing if there are none.
+  Future<void> migrateAccessibility() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    final access = await read();
+    final refresh = await readRefreshToken();
+    if (access != null && refresh != null) {
+      await write(accessToken: access, refreshToken: refresh);
+    }
+  }
 
   Future<void> clear() async {
     await _storage.delete(key: _accessTokenKey);

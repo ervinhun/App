@@ -18,7 +18,9 @@ abstract class FridgesClient {
   factory FridgesClient(Dio dio, {String? baseUrl}) = _FridgesClient;
 
   @POST('/api/fridges')
-  Future<FridgeResponse> create({@Body() required SaveFridgeRequest body});
+  Future<FridgeResponse> createFridge({
+    @Body() required SaveFridgeRequest body,
+  });
 
   @GET('/api/fridges')
   Future<List<FridgeResponse>> getMine();
@@ -26,20 +28,17 @@ abstract class FridgesClient {
   @POST('/api/fridges/Join')
   Future<FridgeResponse> join({@Body() required JoinFridgeRequest body});
 
-  /// null.
-  ///
-  /// The name has been replaced because it contains a keyword. Original name: `get`.
   @GET('/api/fridges/{id}')
-  Future<FridgeResponse> getApiFridgesId({@Path('id') required String id});
+  Future<FridgeResponse> getFridge({@Path('id') required String id});
 
   @PUT('/api/fridges/{id}')
-  Future<FridgeResponse> update({
+  Future<FridgeResponse> updateFridge({
     @Path('id') required String id,
     @Body() required SaveFridgeRequest body,
   });
 
   @DELETE('/api/fridges/{id}')
-  Future<void> delete({@Path('id') required String id});
+  Future<void> deleteFridge({@Path('id') required String id});
 
   @POST('/api/fridges/{id}/RegenerateInviteCode')
   Future<FridgeResponse> regenerateInviteCode({@Path('id') required String id});
