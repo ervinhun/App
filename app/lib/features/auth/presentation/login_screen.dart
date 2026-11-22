@@ -1,18 +1,14 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:app/core/api/api_client.dart';
+import 'package:app/features/auth/data/apple_auth.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// Email/password sign-in and registration, plus "Continue with Google".
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-
-  /// Google sign-in is only configured for Android so far: iOS needs its own
-  /// OAuth client, and the App Store then also requires Sign in with Apple.
-  static bool get googleAvailable =>
-      defaultTargetPlatform == TargetPlatform.android;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -69,6 +65,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _google() =>
       _run(() => ref.read(authControllerProvider.notifier).signInWithGoogle());
+
+  Future<void> _apple() =>
+      _run(() => ref.read(authControllerProvider.notifier).signInWithApple());
 
   @override
   Widget build(BuildContext context) {
@@ -165,23 +164,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'New here? Create an account',
                       ),
                     ),
-                    if (LoginScreen.googleAvailable) ...[
-                      const SizedBox(height: 16),
-                      const Row(
-                        children: [
-                          Expanded(child: Divider()),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('or'),
-                          ),
-                          Expanded(child: Divider()),
-                        ],
+                    const SizedBox(height: 16),
+                    const Row(
+                      children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('or'),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _google,
+                      icon: SvgPicture.asset(
+                        'assets/images/google_logo.svg',
+                        width: 18,
                       ),
-                      const SizedBox(height: 16),
+                      label: const Text('Continue with Google'),
+                    ),
+                    if (AppleAuth.available) ...[
+                      const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: _busy ? null : _google,
-                        icon: const Icon(Icons.login),
-                        label: const Text('Continue with Google'),
+                        onPressed: _busy ? null : _apple,
+                        icon: const Icon(Icons.apple),
+                        label: const Text('Continue with Apple'),
                       ),
                     ],
                   ],

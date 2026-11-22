@@ -31,6 +31,18 @@ abstract final class ApiConfig {
     'GOOGLE_SERVER_CLIENT_ID',
   );
 
+  /// The Google OAuth "iOS" client id. Only iOS needs it (Android finds its client
+  /// by package name and SHA-1); null elsewhere. Public, not a secret.
+  static String? get googleIosClientId =>
+      defaultTargetPlatform == TargetPlatform.iOS &&
+          _googleIosClientId.isNotEmpty
+      ? _googleIosClientId
+      : null;
+
+  static const _googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+  );
+
   /// Throws if required configuration is missing, so a bad build fails on launch
   /// instead of when someone first taps the Google button.
   static void validate() => googleServerClientId;
