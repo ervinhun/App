@@ -6,8 +6,6 @@ import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
-import 'package:app/features/food/data/food_items_controller.dart';
-import 'package:app/features/food/data/food_store.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
@@ -112,12 +110,11 @@ class AuthController extends AsyncNotifier<UserDto?> {
   /// session. Unlike [signOut] it sends no request, so `AuthInterceptor` can
   /// call it while a refresh is in flight.
   ///
-  /// Forgets the food on the phone too, however the session ended, so the
-  /// next person to use the phone doesn't see it.
+  /// The food stays on the phone, with its changes not uploaded yet, for
+  /// using the app offline as a guest; see `FoodStore.claimFor` for what the
+  /// next sign-in does with it.
   Future<void> endSession() async {
     final google = ref.read(googleAuthProvider);
-    await ref.read(foodStoreProvider).clear();
-    ref.invalidate(foodItemsProvider);
     await _tokens.clear();
     state = const AsyncData(null);
     // Cancels a startup check still running, whose late result would undo this.

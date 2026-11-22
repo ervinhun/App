@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:app/features/food/data/food_store.dart';
+
 /// Remembers that the user chose to use the app without an account.
 class GuestStorage {
   GuestStorage([SharedPreferencesAsync? prefs]) : _prefs = prefs;
@@ -40,7 +42,9 @@ class GuestModeController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() => _storage.isGuest();
 
+  /// Food a signed-out account left on the phone becomes the guest's.
   Future<void> enter() async {
+    await ref.read(foodStoreProvider).adoptForGuest();
     state = const AsyncData(true);
     await _storage.setGuest(true);
   }

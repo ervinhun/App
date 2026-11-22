@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 
@@ -20,46 +19,14 @@ class ProfileScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context, ref),
+            // The food stays on the phone (see `AuthController.endSession`).
+            onPressed: () =>
+                ref.read(authControllerProvider.notifier).signOut(),
           ),
         ],
       ),
       body: Center(child: Text('Signed in as ${user.displayName}')),
     );
-  }
-
-  /// Signs out, which forgets this device's food (see
-  /// `AuthController.endSession`). Asks first if some changes haven't been
-  /// uploaded.
-  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
-    final pending = ref.read(syncControllerProvider).pending;
-    if (pending > 0) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Sign out?'),
-          content: Text(
-            pending == 1
-                ? "1 change hasn't been saved online yet. Signing out now "
-                      'loses it.'
-                : "$pending changes haven't been saved online yet. Signing "
-                      'out now loses them.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Sign out'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-    }
-    await ref.read(authControllerProvider.notifier).signOut();
   }
 }
 

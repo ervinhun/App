@@ -186,6 +186,51 @@ void main() {
       expect(await store.items(), isEmpty);
       expect(await store.pendingCount(), 0);
     });
+
+    group('food a guest took over from a signed-out account', () {
+      setUp(() async {
+        await store.claimFor('anna');
+        await onServer(food('a'));
+        await store.adoptForGuest();
+        // The guest's own change.
+        await store.save(food('b', name: 'Added as a guest'), t2);
+      });
+
+      test('stays as it is when that account signs back in', () async {
+        expect(await store.claimFor('anna'), isFalse);
+
+        expect({for (final i in await store.items()) i.id}, {'a', 'b'});
+        expect((await store.nextChange())!.itemId, 'b');
+        expect(await store.pendingCount(), 1);
+      });
+
+      test('goes to another account as new food, not cleared', () async {
+        expect(await store.claimFor('ben'), isTrue);
+
+        final items = await store.items();
+        expect(
+          items.map((i) => i.name),
+          unorderedEquals(['Milk', 'Added as a guest']),
+        );
+        expect(
+          items.map((i) => i.id),
+          isNot(anyOf(contains('a'), contains('b'))),
+        );
+        expect(await store.pendingCount(), 2);
+      });
+    });
+
+    test(
+      'food a guest never used is still cleared for another account',
+      () async {
+        await store.claimFor('anna');
+        await store.save(food('a'), t1);
+
+        // Signed out, and someone else signs in straight away.
+        expect(await store.claimFor('ben'), isTrue);
+        expect(await store.items(), isEmpty);
+      },
+    );
   });
 
   test('seeds only once, even after everything is removed', () async {

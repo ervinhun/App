@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/db/app_database.dart';
+import 'package:app/core/utils/ids.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
 /// The food kept on this device, and the changes the backend hasn't got yet.
@@ -16,6 +17,9 @@ class FoodStore {
 
   static const _seededKey = 'food_seeded';
   static const _ownerKey = 'food_owner';
+
+  /// Who the food was kept from, once a guest uses it ([adoptForGuest]).
+  static const _formerOwnerKey = 'food_former_owner';
 
   Future<List<FoodItem>> items() async => [
     for (final row in await _db.select(_db.foodItems).get()) _toItem(row),
@@ -155,23 +159,51 @@ class FoodStore {
         }
       });
 
-  /// Makes this device's food belong to [userId]. Food left by a different
-  /// account is cleared; a guest's food is kept, and uploaded by the next sync.
-  /// Returns whether anything was cleared.
+  /// Makes this device's food belong to [userId], and says whether that
+  /// changed it.
+  ///
+  /// * Food a different account left on the phone is cleared: the next person
+  ///   to sign in doesn't see it.
+  /// * A guest's food is kept, and uploaded by the next sync. If a guest took
+  ///   it over from a different account ([adoptForGuest]), it's uploaded as
+  ///   new food, which can't clash with that account's copy on the backend.
   Future<bool> claimFor(String userId) => _db.transaction(() async {
     final owner = await _meta(_ownerKey);
     if (owner == userId) return false;
+    final formerOwner = await _meta(_formerOwnerKey);
     await _setMeta(_ownerKey, userId);
-    if (owner == null) return false;
-    await _clearFood();
+    await _deleteMeta(_formerOwnerKey);
+    if (owner != null) {
+      await _clearFood();
+      return true;
+    }
+    if (formerOwner == null || formerOwner == userId) return false;
+    await _copyAsNew(DateTime.now());
     return true;
   });
 
-  /// Forgets all food and queued changes, for signing out.
-  Future<void> clear() => _db.transaction(() async {
-    await _clearFood();
-    await (_db.delete(_db.appMeta)..where((t) => t.key.equals(_ownerKey))).go();
+  /// Makes the food a signed-out account left on the phone a guest's, when
+  /// the app is then used as a guest: what the guest adds and changes is then
+  /// kept for whoever they sign in as. Until then, a different account
+  /// signing in clears it.
+  Future<void> adoptForGuest() => _db.transaction(() async {
+    final owner = await _meta(_ownerKey);
+    if (owner == null) return;
+    await _setMeta(_formerOwnerKey, owner);
+    await _deleteMeta(_ownerKey);
   });
+
+  /// Puts each item under a new id, queued as new. Removals still to send
+  /// are dropped: they were for the old ids.
+  Future<void> _copyAsNew(DateTime changedAt) async {
+    final kept = await items();
+    await _clearFood();
+    for (final item in kept) {
+      final copy = item.withId(newId());
+      await _db.into(_db.foodItems).insert(_toRow(copy));
+      await _queue(copy.id, ChangeKind.save, changedAt);
+    }
+  }
 
   Future<void> _clearFood() async {
     await _db.delete(_db.foodItems).go();
@@ -181,6 +213,9 @@ class FoodStore {
   Future<String?> _meta(String key) async => (await (_db.select(
     _db.appMeta,
   )..where((t) => t.key.equals(key))).getSingleOrNull())?.value;
+
+  Future<void> _deleteMeta(String key) =>
+      (_db.delete(_db.appMeta)..where((t) => t.key.equals(key))).go();
 
   Future<void> _setMeta(String key, String value) => _db
       .into(_db.appMeta)

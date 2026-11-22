@@ -133,6 +133,24 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
   }, variant: android);
 
+  testWidgets('signing out keeps the food, for using the app as a guest', (
+    tester,
+  ) async {
+    tokens.token = 'jwt';
+    await pumpApp(tester);
+    expect(find.text('Chicken breasts'), findsOneWidget);
+
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sign out'));
+    await tester.pumpAndSettle();
+    expect(tokens.token, isNull);
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chicken breasts'), findsOneWidget);
+  }, variant: android);
+
   testWidgets('a backend error is shown on the login screen', (tester) async {
     api.signInError = ApiException(
       'Invalid email or password.',

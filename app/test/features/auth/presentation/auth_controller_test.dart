@@ -37,7 +37,7 @@ void main() {
     guests = FakeGuestStorage();
   });
 
-  test('when the backend ends the session, the food is forgotten', () async {
+  test('when the backend ends the session, the food is kept', () async {
     tokens.token = 'jwt';
     final c = container();
     await c.read(authControllerProvider.future);
@@ -47,8 +47,8 @@ void main() {
 
     await c.read(authControllerProvider.notifier).endSession();
 
-    expect(await store.items(), isEmpty);
-    expect(await store.pendingCount(), 0);
+    expect([for (final item in await store.items()) item.id], ['a']);
+    expect(await store.pendingCount(), 1);
   });
 
   group('startup', () {
