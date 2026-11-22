@@ -171,57 +171,139 @@ void main() {
   );
 
   group('claimFor', () {
-    test("keeps a guest's food for the account they sign in to", () async {
-      await store.save(food('a'), t1);
+    Future<Map<String, String>> onPhone() async => {
+      for (final i in await store.items()) i.id: i.name,
+    };
 
-      expect(await store.claimFor('anna'), isFalse);
-      expect(await store.pendingCount(), 1);
+    group('food a guest added before any account signed in', () {
+      setUp(() async {
+        await store.seedOnce([food('sample', name: 'Sample')]);
+        await store.save(food('a'), t1);
+      });
+
+      test('is offered, without the sample food', () async {
+        expect(await store.guestFoodFor('anna'), 1);
+      });
+
+      test('goes to the account if it adds it', () async {
+        await store.claimFor('anna');
+        expect(await store.pendingCount(), 1);
+      });
+
+      test('is kept on the phone if not, and offered at the next sign-in, '
+          'whoever it is', () async {
+        expect(await store.claimFor('anna', addGuestFood: false), isTrue);
+
+        // The sample food goes with the next sync, as it does for anyone.
+        expect((await onPhone()).keys, ['sample']);
+        expect(await store.pendingCount(), 0);
+
+        await store.markSignedOut();
+        expect(await store.guestFoodFor('ben'), 1);
+        await store.claimFor('ben');
+        expect((await onPhone()).keys, ['a']);
+        expect(await store.pendingCount(), 1);
+      });
     });
 
-    group("another account doesn't get the food", () {
+    group('after an account signs out', () {
       setUp(() async {
         await store.claimFor('anna');
         await onServer(food('a', name: "Anna's milk"));
-        // Still to upload when Anna signs out, then changed as a guest.
+        // Still to upload when Anna signs out.
         await store.save(food('b', name: "Anna's eggs"), t1);
+        await store.markSignedOut();
+        // Then, as a guest: one of Anna's changed, and one added.
+        await store.save(food('a', name: "Anna's milk, opened"), t2);
         await store.save(food('c', name: 'Added as a guest'), t2);
       });
 
-      test('nor sees it', () async {
-        expect(await store.claimFor('ben'), isTrue);
-
-        expect(await store.items(), isEmpty);
-        expect(await store.pendingCount(), 0);
+      test('what the guest added is offered, whoever signs in', () async {
+        expect(await store.guestFoodFor('anna'), 1);
+        expect(await store.guestFoodFor('ben'), 1);
       });
 
-      test('and the first account gets it all back', () async {
+      test('the same account gets it if it adds it', () async {
+        expect(await store.claimFor('anna'), isFalse);
+
+        expect((await onPhone()).keys, {'a', 'b', 'c'});
+        expect(await store.pendingCount(), 3);
+        // Signed in now: nothing more to ask.
+        expect(await store.guestFoodFor('anna'), 0);
+      });
+
+      test('the same account can leave it on the phone', () async {
+        expect(await store.claimFor('anna', addGuestFood: false), isTrue);
+        expect((await onPhone()).keys, {'a', 'b'});
+        expect(await store.guestFoodFor('anna'), 0);
+
+        await store.markSignedOut();
+        expect(await store.guestFoodFor('anna'), 1);
+        await store.claimFor('anna');
+        expect((await onPhone()).keys, {'a', 'b', 'c'});
+      });
+
+      test('another account gets only what the guest added', () async {
+        expect(await store.claimFor('ben'), isTrue);
+
+        expect(await onPhone(), {'c': 'Added as a guest'});
+        expect(await store.pendingCount(), 1);
+      });
+
+      test('left on the phone by another account, it goes to neither until '
+          'one adds it', () async {
+        await store.claimFor('ben', addGuestFood: false);
+        expect(await store.items(), isEmpty);
+        await store.markSignedOut();
+
+        expect(await store.guestFoodFor('anna'), 1);
+        await store.claimFor('anna', addGuestFood: false);
+        expect((await onPhone()).keys, {'a', 'b'});
+      });
+
+      test('the account gets its food back, as it was', () async {
         await store.claimFor('ben');
         await store.save(food('x', name: "Ben's milk"), t2);
+        await store.markSignedOut();
 
+        expect(await store.guestFoodFor('anna'), 0);
         expect(await store.claimFor('anna'), isTrue);
 
-        expect(
-          {for (final i in await store.items()) i.id: i.name},
-          {'a': "Anna's milk", 'b': "Anna's eggs", 'c': 'Added as a guest'},
-        );
+        expect(await onPhone(), {
+          'a': "Anna's milk, opened",
+          'b': "Anna's eggs",
+        });
+        // In the order they were made.
         expect((await store.nextChange())!.itemId, 'b');
         expect(await store.pendingCount(), 2);
         // Still known to be on the backend, so removing it is sent.
         await store.delete('a', t2);
-        expect(await store.pendingCount(), 3);
+        expect(await store.pendingCount(), 2);
 
-        // And Ben's, in turn.
+        // And Ben's, which is now set aside.
+        await store.markSignedOut();
         await store.claimFor('ben');
-        expect([for (final i in await store.items()) i.id], ['x']);
+        expect((await onPhone()).keys, {'c', 'x'});
       });
     });
 
-    test('signing back in to the same account changes nothing', () async {
+    test('the app starting again, still signed in, asks nothing', () async {
       await store.claimFor('anna');
       await store.save(food('a'), t1);
 
+      expect(await store.guestFoodFor('anna'), 0);
       expect(await store.claimFor('anna'), isFalse);
       expect(await store.pendingCount(), 1);
+    });
+
+    test('signing in as another account without a sign-out on this phone '
+        'sets all the food aside', () async {
+      await store.claimFor('anna');
+      await store.save(food('a'), t1);
+
+      expect(await store.guestFoodFor('ben'), 0);
+      expect(await store.claimFor('ben'), isTrue);
+      expect(await store.items(), isEmpty);
     });
   });
 

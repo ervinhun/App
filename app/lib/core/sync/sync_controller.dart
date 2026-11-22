@@ -10,6 +10,7 @@ import 'package:app/core/sync/connectivity.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/data/food_store.dart';
+import 'package:app/features/food/data/guest_food_question.dart';
 import 'package:app/features/food/data/items_remote.dart';
 
 @immutable
@@ -61,6 +62,9 @@ class SyncController extends Notifier<SyncStatus> {
   bool _running = false;
   bool _runAgain = false;
 
+  /// Signing in is deciding whose the food is: nothing is sent meanwhile.
+  bool _claiming = false;
+
   FoodStore get _store => ref.read(foodStoreProvider);
 
   @override
@@ -81,14 +85,32 @@ class SyncController extends Notifier<SyncStatus> {
   /// A change was saved on the device.
   void changed() => unawaited(syncNow());
 
+  /// Makes the food on the phone [userId]'s, asking first whether to add
+  /// what a guest added.
   Future<void> _signedIn(String userId) async {
-    if (await _store.claimFor(userId)) {
-      await ref.read(foodItemsProvider.notifier).reload();
+    _claiming = true;
+    try {
+      final guestFood = await _store.guestFoodFor(userId);
+      var add = true;
+      if (guestFood > 0) {
+        final answer = await ref
+            .read(guestFoodQuestionProvider.notifier)
+            .ask(guestFood);
+        // Signed out, or in as someone else, before answering.
+        if (answer == null || !ref.mounted) return;
+        add = answer;
+      }
+      if (await _store.claimFor(userId, addGuestFood: add) && ref.mounted) {
+        await ref.read(foodItemsProvider.notifier).reload();
+      }
+    } finally {
+      _claiming = false;
     }
     await syncNow();
   }
 
   Future<void> syncNow() async {
+    if (_claiming) return _updatePending();
     if (_running) {
       _runAgain = true;
       return;

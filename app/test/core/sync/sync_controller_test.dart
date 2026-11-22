@@ -6,6 +6,7 @@ import 'package:app/core/sync/connectivity.dart';
 import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
+import 'package:app/features/food/data/guest_food_question.dart';
 import 'package:app/features/food/data/items_remote.dart';
 import 'package:app/features/food/data/sample_food.dart';
 import 'package:app/features/food/domain/food_item.dart';
@@ -61,6 +62,8 @@ class _FakeAuth extends AuthController {
   Future<UserDto?> build() async => _user;
 
   void signIn(UserDto user) => state = AsyncData(user);
+
+  void signOutHere() => state = const AsyncData(null);
 }
 
 void main() {
@@ -248,6 +251,9 @@ void main() {
 
     (c.read(authControllerProvider.notifier) as _FakeAuth).signIn(anna);
     await settle();
+    expect(c.read(guestFoodQuestionProvider), 1);
+    c.read(guestFoodQuestionProvider.notifier).answer(add: true);
+    await settle();
 
     expect(remote.calls, ['save a']);
     expect(names(), {'Milk'});
@@ -272,5 +278,52 @@ void main() {
 
     expect(names(), isEmpty);
     expect(status().pending, 0);
+  });
+
+  group("a guest's food, at sign-in", () {
+    _FakeAuth auth() => c.read(authControllerProvider.notifier) as _FakeAuth;
+    GuestFoodQuestionController question() =>
+        c.read(guestFoodQuestionProvider.notifier);
+
+    setUp(() async {
+      remote.items['x'] = food('x', name: 'On the account');
+      start(user: null);
+      await settle();
+      foodNotifier().add(food('a', name: 'Added as a guest'));
+      await settle();
+      auth().signIn(anna);
+      await settle();
+    });
+
+    test('is asked about first, and nothing is sent meanwhile', () async {
+      expect(c.read(guestFoodQuestionProvider), 1);
+      expect(remote.calls, isEmpty);
+
+      question().answer(add: true);
+      await settle();
+
+      expect(c.read(guestFoodQuestionProvider), isNull);
+      expect(remote.calls, ['save a']);
+      expect(names(), {'Added as a guest', 'On the account'});
+    });
+
+    test("isn't added if the user keeps it on the phone", () async {
+      question().answer(add: false);
+      await settle();
+
+      expect(remote.calls, isEmpty);
+      expect(names(), {'On the account'});
+      expect(status().pending, 0);
+    });
+
+    test('stays a guest\'s if they sign out before answering', () async {
+      auth().signOutHere();
+      await settle();
+
+      expect(c.read(guestFoodQuestionProvider), isNull);
+      expect(remote.calls, isEmpty);
+      expect(names(), {'Added as a guest'});
+      expect(status().pending, 1);
+    });
   });
 }

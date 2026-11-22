@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/db/app_database.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
+typedef _Food = ({List<FoodItemRow> rows, List<PendingChange> changes});
+
 /// The food kept on this device, and the changes the backend hasn't got yet.
 ///
 /// Every change is saved here first, so the app works the same offline. The
@@ -21,6 +23,13 @@ class FoodStore {
 
   /// Each account's food while another account is signed in ([claimFor]).
   static String _setAsideKey(String userId) => 'food_set_aside:$userId';
+
+  /// Food a guest added and chose to keep on the phone rather than add to the
+  /// account signing in ([claimFor]).
+  static const _keptByGuestKey = 'food_kept_by_guest';
+
+  /// The items on the phone when the account signed out ([markSignedOut]).
+  static const _signedOutItemsKey = 'food_signed_out_items';
 
   Future<List<FoodItem>> items() async => [
     for (final row in await _db.select(_db.foodItems).get()) _toItem(row),
@@ -160,6 +169,28 @@ class FoodStore {
         }
       });
 
+  /// Notes which food the signed-in account leaves on the phone as it signs
+  /// out, so what a guest adds after can be told apart from it.
+  Future<void> markSignedOut() => _db.transaction(() async {
+    if (await _meta(_ownerKey) == null) return;
+    if (await _meta(_signedOutItemsKey) != null) return;
+    final rows = await _db.select(_db.foodItems).get();
+    await _setMeta(
+      _signedOutItemsKey,
+      jsonEncode([for (final row in rows) row.id]),
+    );
+  });
+
+  /// How many items a guest added on this phone, which signing in as
+  /// [userId] can add to that account. None when [userId] is still signed in,
+  /// e.g. when the app starts again.
+  Future<int> guestFoodFor(String userId) => _db.transaction(() async {
+    final owner = await _meta(_ownerKey);
+    if (await _stillSignedIn(owner, userId)) return 0;
+    final kept = await _kept(_keptByGuestKey);
+    return (await _guestItemIds(owner)).length + (kept?.rows.length ?? 0);
+  });
+
   /// Makes this device's food belong to [userId], and says whether that
   /// changed it.
   ///
@@ -168,61 +199,132 @@ class FoodStore {
   /// to another:
   /// * Food the account last signed in left is set aside for when it signs in
   ///   again. It stays on show after signing out, for using the app as a
-  ///   guest; what the guest changes then is that account's too.
+  ///   guest; what the guest changes in it is that account's too.
   /// * Food [userId] had set aside comes back, and the next sync uploads its
   ///   changes and fetches the rest.
-  /// * A guest's food, from before any account signed in, is kept, and
-  ///   uploaded by the next sync.
-  Future<bool> claimFor(String userId) => _db.transaction(() async {
-    final owner = await _meta(_ownerKey);
-    if (owner == userId) return false;
-    if (owner != null) await _setAside(owner);
-    await _setMeta(_ownerKey, userId);
-    final restored = await _restore(userId);
-    return owner != null || restored;
-  });
+  /// * Food a guest added ([guestFoodFor]) goes to [userId] with
+  ///   [addGuestFood], and is uploaded by the next sync. Without, it's kept
+  ///   on the phone, out of view, and offered again at the next sign-in.
+  Future<bool> claimFor(String userId, {bool addGuestFood = true}) =>
+      _db.transaction(() async {
+        final owner = await _meta(_ownerKey);
+        if (await _stillSignedIn(owner, userId)) return false;
+        final switching = owner != null && owner != userId;
+        var changed = switching;
+        final guestIds = await _guestItemIds(owner);
+        final guestFood = guestIds.isEmpty ? null : await _take(guestIds);
+        if (guestFood != null && !addGuestFood) {
+          await _keep(_keptByGuestKey, guestFood);
+          changed = true;
+        }
+        if (switching) await _keep(_setAsideKey(owner), await _take());
+        await _deleteMeta(_signedOutItemsKey);
+        await _setMeta(_ownerKey, userId);
+        if (switching && await _bringBack(_setAsideKey(userId))) changed = true;
+        if (addGuestFood) {
+          if (guestFood != null) await _put(guestFood);
+          if (await _bringBack(_keptByGuestKey)) changed = true;
+        }
+        return changed;
+      });
 
-  /// Moves the food and its queued changes out of view, for [userId].
-  Future<void> _setAside(String userId) async {
-    final rows = await _db.select(_db.foodItems).get();
-    final changes = await (_db.select(
+  /// Whether [userId] owns the food and hasn't signed out since: nothing to
+  /// decide.
+  Future<bool> _stillSignedIn(String? owner, String userId) async =>
+      owner == userId && await _meta(_signedOutItemsKey) == null;
+
+  /// The items a guest added: new or changed since [owner] signed out, or
+  /// since the app was installed. Sample food the guest never changed isn't
+  /// theirs: it's never uploaded.
+  Future<Set<String>> _guestItemIds(String? owner) async {
+    final signedOut = await _meta(_signedOutItemsKey);
+    // Not signed out on this phone: it's all the account's.
+    if (owner != null && signedOut == null) return const {};
+    final accounts = signedOut == null
+        ? const <String>{}
+        : {...(jsonDecode(signedOut) as List<dynamic>).cast<String>()};
+    final present = {
+      for (final row in await _db.select(_db.foodItems).get()) row.id,
+    };
+    final saves = await (_db.select(
       _db.pendingChanges,
-    )..orderBy([(t) => OrderingTerm(expression: t.seq)])).get();
+    )..where((t) => t.kind.equalsValue(ChangeKind.save))).get();
+    return {
+      for (final change in saves)
+        if (present.contains(change.itemId) &&
+            !accounts.contains(change.itemId))
+          change.itemId,
+    };
+  }
+
+  /// Keeps [food] out of view under [key], after what's already there.
+  Future<void> _keep(String key, _Food food) async {
+    final kept = await _kept(key);
+    final rows = [...?kept?.rows, ...food.rows];
+    final changes = [...?kept?.changes, ...food.changes];
     await _setMeta(
-      _setAsideKey(userId),
+      key,
       jsonEncode({
         'items': [for (final row in rows) row.toJson()],
         'changes': [for (final change in changes) change.toJson()],
       }),
     );
-    await _clearFood();
   }
 
-  /// Brings back the food set aside for [userId], if any, and says whether
-  /// there was some.
-  Future<bool> _restore(String userId) async {
-    final json = await _meta(_setAsideKey(userId));
-    if (json == null) return false;
-    await _deleteMeta(_setAsideKey(userId));
-    final saved = jsonDecode(json) as Map<String, dynamic>;
-    for (final row in saved['items'] as List<dynamic>) {
-      await _db
-          .into(_db.foodItems)
-          .insertOnConflictUpdate(
-            FoodItemRow.fromJson(row as Map<String, dynamic>),
-          );
-    }
-    // Oldest first, so they keep their order in the queue.
-    for (final change in saved['changes'] as List<dynamic>) {
-      final c = PendingChange.fromJson(change as Map<String, dynamic>);
-      await _queue(c.itemId, c.kind, c.changedAt);
-    }
+  Future<_Food?> _kept(String key) async {
+    final json = await _meta(key);
+    if (json == null) return null;
+    final kept = jsonDecode(json) as Map<String, dynamic>;
+    return (
+      rows: [
+        for (final row in kept['items'] as List<dynamic>)
+          FoodItemRow.fromJson(row as Map<String, dynamic>),
+      ],
+      changes: [
+        for (final change in kept['changes'] as List<dynamic>)
+          PendingChange.fromJson(change as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// Brings back the food kept under [key], if any, and says whether there
+  /// was some.
+  Future<bool> _bringBack(String key) async {
+    final kept = await _kept(key);
+    if (kept == null) return false;
+    await _deleteMeta(key);
+    await _put(kept);
     return true;
   }
 
-  Future<void> _clearFood() async {
-    await _db.delete(_db.foodItems).go();
-    await _db.delete(_db.pendingChanges).go();
+  /// Removes the items with [ids], or all, with their queued changes, and
+  /// returns them, changes oldest first.
+  Future<_Food> _take([Set<String>? ids]) async {
+    final rows = _db.select(_db.foodItems);
+    final changes = _db.select(_db.pendingChanges)
+      ..orderBy([(t) => OrderingTerm(expression: t.seq)]);
+    final deleteRows = _db.delete(_db.foodItems);
+    final deleteChanges = _db.delete(_db.pendingChanges);
+    if (ids != null) {
+      rows.where((t) => t.id.isIn(ids));
+      changes.where((t) => t.itemId.isIn(ids));
+      deleteRows.where((t) => t.id.isIn(ids));
+      deleteChanges.where((t) => t.itemId.isIn(ids));
+    }
+    final food = (rows: await rows.get(), changes: await changes.get());
+    await deleteRows.go();
+    await deleteChanges.go();
+    return food;
+  }
+
+  Future<void> _put(_Food food) async {
+    for (final row in food.rows) {
+      await _db.into(_db.foodItems).insertOnConflictUpdate(row);
+    }
+    // In the order given, so they keep their order in the queue.
+    for (final change in food.changes) {
+      await _queue(change.itemId, change.kind, change.changedAt);
+    }
   }
 
   Future<String?> _meta(String key) async => (await (_db.select(

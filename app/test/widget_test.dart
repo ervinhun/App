@@ -3,6 +3,7 @@ import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
+import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/data/product_catalog_api.dart';
 import 'package:app/features/notifications/data/background_refresh.dart';
 import 'package:app/features/notifications/data/notification_api.dart';
@@ -17,6 +18,7 @@ import 'core/db/test_database.dart';
 import 'core/storage/fake_hint_storage.dart';
 import 'features/notifications/fakes.dart';
 import 'features/auth/fakes.dart';
+import 'features/food/food_store_test.dart' show food;
 
 void main() {
   late FakeTokenStorage tokens;
@@ -149,6 +151,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Chicken breasts'), findsOneWidget);
+  }, variant: android);
+
+  /// A guest adds food, then signs in with Google, and is asked about it.
+  Future<void> addAsGuestThenSignIn(WidgetTester tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+    ProviderScope.containerOf(tester.element(find.byType(FridgeFriendApp)))
+        .read(foodItemsProvider.notifier)
+        .add(food('a', name: 'Oat milk'));
+    await tester.pumpAndSettle();
+    expect(find.text('Oat milk'), findsOneWidget);
+
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in or create an account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add food to your account?'), findsOneWidget);
+  }
+
+  testWidgets("signing in asks to add a guest's food, and adds it", (
+    tester,
+  ) async {
+    await addAsGuestThenSignIn(tester);
+
+    await tester.tap(find.text('Add to account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add food to your account?'), findsNothing);
+    expect(find.text('Oat milk'), findsOneWidget);
+  }, variant: android);
+
+  testWidgets("signing in asks to add a guest's food, and can keep it", (
+    tester,
+  ) async {
+    await addAsGuestThenSignIn(tester);
+
+    await tester.tap(find.text('Keep on this phone'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oat milk'), findsNothing);
   }, variant: android);
 
   testWidgets('a backend error is shown on the login screen', (tester) async {

@@ -6,6 +6,7 @@ import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
+import 'package:app/features/food/data/food_store.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
@@ -115,6 +116,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
   /// next sign-in does with it.
   Future<void> endSession() async {
     final google = ref.read(googleAuthProvider);
+    await ref.read(foodStoreProvider).markSignedOut();
     await _tokens.clear();
     state = const AsyncData(null);
     // Cancels a startup check still running, whose late result would undo this.

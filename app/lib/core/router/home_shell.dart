@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/features/food/presentation/guest_food_prompt.dart';
 
 /// The signed-in app: one tab per branch of [shell], with the main navigation
 /// bar underneath.
@@ -21,7 +22,7 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: shell,
+    body: GuestFoodPrompt(child: shell),
     bottomNavigationBar: ColoredBox(
       color: AppColors.canvas,
       child: SafeArea(
