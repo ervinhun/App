@@ -1,8 +1,9 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/db/app_database.dart';
-import 'package:app/core/utils/ids.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
 /// The food kept on this device, and the changes the backend hasn't got yet.
@@ -18,8 +19,8 @@ class FoodStore {
   static const _seededKey = 'food_seeded';
   static const _ownerKey = 'food_owner';
 
-  /// Who the food was kept from, once a guest uses it ([adoptForGuest]).
-  static const _formerOwnerKey = 'food_former_owner';
+  /// Each account's food while another account is signed in ([claimFor]).
+  static String _setAsideKey(String userId) => 'food_set_aside:$userId';
 
   Future<List<FoodItem>> items() async => [
     for (final row in await _db.select(_db.foodItems).get()) _toItem(row),
@@ -162,47 +163,61 @@ class FoodStore {
   /// Makes this device's food belong to [userId], and says whether that
   /// changed it.
   ///
-  /// * Food a different account left on the phone is cleared: the next person
-  ///   to sign in doesn't see it.
-  /// * A guest's food is kept, and uploaded by the next sync. If a guest took
-  ///   it over from a different account ([adoptForGuest]), it's uploaded as
-  ///   new food, which can't clash with that account's copy on the backend.
+  /// Each account keeps its own food on the phone, changes not uploaded yet
+  /// included, so signing in as someone else never sends one account's food
+  /// to another:
+  /// * Food the account last signed in left is set aside for when it signs in
+  ///   again. It stays on show after signing out, for using the app as a
+  ///   guest; what the guest changes then is that account's too.
+  /// * Food [userId] had set aside comes back, and the next sync uploads its
+  ///   changes and fetches the rest.
+  /// * A guest's food, from before any account signed in, is kept, and
+  ///   uploaded by the next sync.
   Future<bool> claimFor(String userId) => _db.transaction(() async {
     final owner = await _meta(_ownerKey);
     if (owner == userId) return false;
-    final formerOwner = await _meta(_formerOwnerKey);
+    if (owner != null) await _setAside(owner);
     await _setMeta(_ownerKey, userId);
-    await _deleteMeta(_formerOwnerKey);
-    if (owner != null) {
-      await _clearFood();
-      return true;
-    }
-    if (formerOwner == null || formerOwner == userId) return false;
-    await _copyAsNew(DateTime.now());
-    return true;
+    final restored = await _restore(userId);
+    return owner != null || restored;
   });
 
-  /// Makes the food a signed-out account left on the phone a guest's, when
-  /// the app is then used as a guest: what the guest adds and changes is then
-  /// kept for whoever they sign in as. Until then, a different account
-  /// signing in clears it.
-  Future<void> adoptForGuest() => _db.transaction(() async {
-    final owner = await _meta(_ownerKey);
-    if (owner == null) return;
-    await _setMeta(_formerOwnerKey, owner);
-    await _deleteMeta(_ownerKey);
-  });
-
-  /// Puts each item under a new id, queued as new. Removals still to send
-  /// are dropped: they were for the old ids.
-  Future<void> _copyAsNew(DateTime changedAt) async {
-    final kept = await items();
+  /// Moves the food and its queued changes out of view, for [userId].
+  Future<void> _setAside(String userId) async {
+    final rows = await _db.select(_db.foodItems).get();
+    final changes = await (_db.select(
+      _db.pendingChanges,
+    )..orderBy([(t) => OrderingTerm(expression: t.seq)])).get();
+    await _setMeta(
+      _setAsideKey(userId),
+      jsonEncode({
+        'items': [for (final row in rows) row.toJson()],
+        'changes': [for (final change in changes) change.toJson()],
+      }),
+    );
     await _clearFood();
-    for (final item in kept) {
-      final copy = item.withId(newId());
-      await _db.into(_db.foodItems).insert(_toRow(copy));
-      await _queue(copy.id, ChangeKind.save, changedAt);
+  }
+
+  /// Brings back the food set aside for [userId], if any, and says whether
+  /// there was some.
+  Future<bool> _restore(String userId) async {
+    final json = await _meta(_setAsideKey(userId));
+    if (json == null) return false;
+    await _deleteMeta(_setAsideKey(userId));
+    final saved = jsonDecode(json) as Map<String, dynamic>;
+    for (final row in saved['items'] as List<dynamic>) {
+      await _db
+          .into(_db.foodItems)
+          .insertOnConflictUpdate(
+            FoodItemRow.fromJson(row as Map<String, dynamic>),
+          );
     }
+    // Oldest first, so they keep their order in the queue.
+    for (final change in saved['changes'] as List<dynamic>) {
+      final c = PendingChange.fromJson(change as Map<String, dynamic>);
+      await _queue(c.itemId, c.kind, c.changedAt);
+    }
+    return true;
   }
 
   Future<void> _clearFood() async {
