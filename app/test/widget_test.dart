@@ -216,9 +216,10 @@ void main() {
     expect(find.text('Invalid email or password.'), findsOneWidget);
   }, variant: android);
 
-  testWidgets('Google button is hidden on iOS for now', (tester) async {
+  testWidgets('iOS offers Apple next to Google', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Apple'), findsOneWidget);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 }

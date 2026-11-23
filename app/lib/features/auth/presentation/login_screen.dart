@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,18 +7,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/features/auth/data/apple_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 
 /// "Continue with Google", "Continue with email" and "Continue as guest", as
-/// in the Figma Login screen. Email opens the sign-in and registration form.
+/// in the Figma Login screen, plus "Continue with Apple" on iOS. Email opens
+/// the sign-in and registration form.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-
-  /// Google sign-in is only configured for Android so far: iOS needs its own
-  /// OAuth client, and the App Store then also requires Sign in with Apple.
-  static bool get googleAvailable =>
-      defaultTargetPlatform == TargetPlatform.android;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -78,6 +74,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _google() =>
       _run(() => ref.read(authControllerProvider.notifier).signInWithGoogle());
+
+  Future<void> _apple() =>
+      _run(() => ref.read(authControllerProvider.notifier).signInWithApple());
 
   void _showEmail(bool show) => setState(() {
     _withEmail = show;
@@ -146,15 +145,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               if (_withEmail)
                 _buildEmailForm()
               else ...[
-                if (LoginScreen.googleAvailable)
+                _OutlinedButton(
+                  onPressed: _busy ? null : _google,
+                  icon: SvgPicture.asset(
+                    'assets/images/google_logo.svg',
+                    width: 20,
+                    height: 20,
+                  ),
+                  label: 'Continue with Google',
+                ),
+                if (AppleAuth.available)
                   _OutlinedButton(
-                    onPressed: _busy ? null : _google,
-                    icon: SvgPicture.asset(
-                      'assets/images/google_logo.svg',
-                      width: 20,
-                      height: 20,
+                    onPressed: _busy ? null : _apple,
+                    icon: const Icon(
+                      Icons.apple,
+                      size: 20,
+                      color: AppColors.textPrimary,
                     ),
-                    label: 'Continue with Google',
+                    label: 'Continue with Apple',
                   ),
                 _FilledButton(
                   label: 'Continue with email',

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
+import 'package:app/features/auth/data/apple_auth.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/food/data/food_store.dart';
@@ -85,6 +86,25 @@ class AuthController extends AsyncNotifier<UserDto?> {
         _signIn.externalLogin(
           body: ExternalLoginRequest(
             provider: 'google',
+            idToken: credential.idToken,
+            displayName: credential.displayName,
+            platform: _platform,
+          ),
+        ),
+      ),
+    );
+    return true;
+  }
+
+  /// Returns false if the user closed Apple's sheet.
+  Future<bool> signInWithApple() async {
+    final credential = await ref.read(appleAuthProvider).signIn();
+    if (credential == null) return false;
+    await _start(
+      await apiCall(
+        _signIn.externalLogin(
+          body: ExternalLoginRequest(
+            provider: 'apple',
             idToken: credential.idToken,
             displayName: credential.displayName,
             platform: _platform,

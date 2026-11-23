@@ -52,6 +52,7 @@ class GoogleAuth {
   /// the next attempt tries again.
   Future<void> _ensureInitialized() async {
     final initializing = _initialized ??= _google.initialize(
+      clientId: ApiConfig.googleIosClientId,
       serverClientId: _serverClientId ?? ApiConfig.googleServerClientId,
     );
     try {
