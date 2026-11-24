@@ -18,9 +18,13 @@ enum FoodFilter {
 
   final String label;
 
-  bool matches(FoodItem item, DateTime today) => switch (this) {
+  bool matches(
+    FoodItem item,
+    DateTime today, [
+    ExpiryThresholds t = defaultThresholds,
+  ]) => switch (this) {
     all => true,
-    expiring => item.urgency(today) == ExpiryUrgency.soon,
+    expiring => item.urgency(today, t) != ExpiryUrgency.later,
     dairy => item.category == FoodCategory.dairy,
     veg => item.category == FoodCategory.veg,
     meat => item.category == FoodCategory.meat,
@@ -267,11 +271,15 @@ class _ViewToggle extends StatelessWidget {
 class StorageTabs extends StatelessWidget {
   const StorageTabs({
     super.key,
+    required this.storages,
+    required this.labelFor,
     required this.selected,
     required this.counts,
     required this.onSelected,
   });
 
+  final List<StorageLocation> storages;
+  final String Function(StorageLocation) labelFor;
   final StorageLocation selected;
   final Map<StorageLocation, int> counts;
   final ValueChanged<StorageLocation> onSelected;
@@ -280,15 +288,15 @@ class StorageTabs extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     spacing: 6,
     children: [
-      for (final (location, icon, label) in [
-        (StorageLocation.fridge, LucideIcons.refrigerator, 'Fridge'),
-        (StorageLocation.freezer, LucideIcons.snowflake, 'Freezer'),
-        (StorageLocation.pantry, LucideIcons.archive, 'Pantry'),
-      ])
+      for (final (location, icon) in [
+        (StorageLocation.fridge, LucideIcons.refrigerator),
+        (StorageLocation.freezer, LucideIcons.snowflake),
+        (StorageLocation.pantry, LucideIcons.archive),
+      ].where((s) => storages.contains(s.$1)))
         Expanded(
           child: _StorageTab(
             icon: icon,
-            label: label,
+            label: labelFor(location),
             count: counts[location] ?? 0,
             active: location == selected,
             onTap: () => onSelected(location),

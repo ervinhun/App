@@ -13,6 +13,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/storage/fake_hint_storage.dart';
 import '../auth/fakes.dart';
+import '../fridges/fakes.dart';
 
 void main() {
   final today = DateTime.now();
@@ -69,6 +70,9 @@ void main() {
   Future<void> pumpDashboard(
     WidgetTester tester, {
     HintStorage? hints,
+    List<FoodItem>? food,
+    FakeFridgesApi? fridges,
+    FakeLastSpace? lastSpace,
     bool settle = true,
   }) async {
     tester.view.physicalSize = const Size(430, 2000);
@@ -81,7 +85,8 @@ void main() {
           tokenStorageProvider.overrideWithValue(FakeTokenStorage('jwt')),
           authClientProvider.overrideWithValue(FakeAuthClient()),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
-          initialFoodProvider.overrideWithValue(items),
+          initialFoodProvider.overrideWithValue(food ?? items),
+          ...fridgeOverrides(fridges, lastSpace),
           hintStorageProvider.overrideWithValue(
             hints ?? FakeHintStorage(swipeDone: true),
           ),
@@ -316,8 +321,9 @@ void main() {
       tester,
     ) async {
       await pumpDashboard(tester, hints: FakeHintStorage(), settle: false);
-      await tester.pump();
-      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(); // The fridge spaces load first.
+      }
 
       await tester.pump(const Duration(milliseconds: 1000));
       expect(
@@ -336,12 +342,259 @@ void main() {
 
     testWidgets('no peek once the user knows how to swipe', (tester) async {
       await pumpDashboard(tester, settle: false);
-      await tester.pump();
-      await tester.pump();
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(); // The fridge spaces load first.
+      }
 
       await tester.pump(const Duration(milliseconds: 1000));
       expect(find.byIcon(LucideIcons.trash), findsNothing);
       await tester.pumpAndSettle();
     });
+  });
+
+  double top(WidgetTester tester, String text) =>
+      tester.getTopLeft(find.text(text).first).dy;
+
+  Future<void> switchTo(WidgetTester tester, String from, String to) async {
+    await tester.tap(find.text(from).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, to));
+    await tester.pumpAndSettle();
+  }
+
+  group('fridge spaces', () {
+    final office = fakeSpace(
+      id: 'office',
+      name: 'Office',
+      storages: [StorageLocation.fridge],
+      names: {StorageLocation.fridge: 'Office fridge'},
+      createdAt: DateTime(2027), // After Home: Home is the user's first.
+    );
+
+    testWidgets('opens on the last one, by name; switching is remembered', (
+      tester,
+    ) async {
+      final last = FakeLastSpace('office');
+      await pumpDashboard(
+        tester,
+        fridges: FakeFridgesApi([fakeSpace(), office]),
+        lastSpace: last,
+      );
+      expect(find.text('Office'), findsNWidgets(2)); // Switcher and title.
+      expect(find.text('Office fridge'), findsOneWidget); // Its own tabs.
+      expect(find.text('Freezer'), findsNothing);
+
+      await switchTo(tester, 'Office', 'Home');
+      expect(find.text('Home'), findsNWidgets(2));
+      expect(find.text('Freezer'), findsOneWidget);
+      expect(last.id, 'home');
+    });
+
+    testWidgets('only the first has the sample food, each keeps its own', (
+      tester,
+    ) async {
+      await pumpDashboard(
+        tester,
+        fridges: FakeFridgesApi([office, fakeSpace()]),
+      );
+      await tester.drag(find.text('Whole milk'), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      await switchTo(tester, 'Home', 'Office');
+      expect(find.text('Nothing in here yet.'), findsOneWidget);
+
+      await switchTo(tester, 'Office', 'Home');
+      expect(find.text('Chicken breasts'), findsOneWidget);
+      expect(find.text('Whole milk'), findsNothing);
+    });
+
+    testWidgets('without one: create it, with what is in it', (tester) async {
+      final api = FakeFridgesApi([]);
+      await pumpDashboard(tester, fridges: api);
+      expect(find.text('Add manual'), findsNothing);
+
+      await tester.tap(find.text('Create a fridge space'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please fill this in.'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Summer house');
+      await tester.tap(find.widgetWithText(FilterChip, 'Pantry'));
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+      expect(api.created.single.$2, [
+        StorageLocation.fridge,
+        StorageLocation.freezer,
+      ]);
+      expect(find.text('Summer house'), findsNWidgets(2));
+      expect(find.text('Pantry'), findsNothing);
+    });
+
+    testWidgets('without one: join, after a wrong code', (tester) async {
+      final api = FakeFridgesApi([])
+        ..joinError = ApiException('No fridge has this invite code.');
+      await pumpDashboard(tester, fridges: api);
+
+      await tester.tap(find.text('Join with an invite code'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'WRONG');
+      await tester.tap(find.text('Join'));
+      await tester.pumpAndSettle();
+      expect(find.text('No fridge has this invite code.'), findsOneWidget);
+
+      api.joinError = null;
+      await tester.tap(find.text('Join'));
+      await tester.pumpAndSettle();
+      expect(api.joined, ['WRONG']);
+      expect(find.text('Office'), findsNWidgets(2));
+    });
+
+    testWidgets('owners see the invite code, and can make a new one', (
+      tester,
+    ) async {
+      await pumpDashboard(tester);
+      await tester.tap(find.text('Home').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Invite people to Home'));
+      await tester.pumpAndSettle();
+      expect(find.text('ABCD2345'), findsOneWidget);
+
+      await tester.tap(find.text('Copy code'));
+      await tester.pumpAndSettle();
+      expect(find.text('Copied'), findsOneWidget);
+
+      await tester.tap(find.text('Make a new code'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Make new code'));
+      await tester.pumpAndSettle();
+      expect(find.text('NEWCODE9'), findsOneWidget);
+    });
+
+    testWidgets('members get no invite code', (tester) async {
+      await pumpDashboard(
+        tester,
+        fridges: FakeFridgesApi([fakeSpace(isOwner: false)]),
+      );
+      await tester.tap(find.text('Home').first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Invite people'), findsNothing);
+    });
+
+    testWidgets('a failed load offers to try again', (tester) async {
+      final api = FakeFridgesApi()..loadError = ApiException('Offline.');
+      await pumpDashboard(tester, fridges: api);
+      expect(find.text('Offline.'), findsOneWidget);
+
+      api.loadError = null;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add manual'), findsOneWidget);
+    });
+
+    testWidgets('no add buttons for members who may not put food in', (
+      tester,
+    ) async {
+      await pumpDashboard(
+        tester,
+        fridges: FakeFridgesApi([fakeSpace(canPut: false)]),
+      );
+      expect(find.text('Whole milk'), findsOneWidget);
+      expect(find.text('Add manual'), findsNothing);
+    });
+  });
+
+  group('sections', () {
+    final expired = [
+      for (final (id, days) in [('Old yoghurt', 1), ('Old ham', 3)])
+        FoodItem(
+          id: id,
+          name: id,
+          amount: '1 pack',
+          category: FoodCategory.dairy,
+          productCategory: 'Dairy & Eggs',
+          productType: 'Yogurt',
+          storage: StorageLocation.fridge,
+          bestBefore: day(-days),
+        ),
+    ];
+
+    testWidgets('expired, first dibs, fine for a while; empty ones hidden', (
+      tester,
+    ) async {
+      await pumpDashboard(tester);
+      expect(find.text('Expired'), findsNothing);
+
+      await pumpDashboard(tester, food: [...items, ...expired]);
+      final order = [
+        'Expired', 'Old ham', 'First dibs', 'Chicken breasts', //
+        'Whole milk', 'Fine for a while', 'Free-range eggs',
+      ];
+      final tops = [for (final text in order) top(tester, text)];
+      expect(tops, orderedEquals([...tops]..sort()));
+    });
+
+    testWidgets('Remove all takes out the expired food, with undo', (
+      tester,
+    ) async {
+      await pumpDashboard(tester, food: [...items, ...expired]);
+      await tester.tap(find.text('Remove all'));
+      await tester.pumpAndSettle();
+      expect(find.text('Expired'), findsNothing);
+      expect(find.text('Whole milk'), findsOneWidget);
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Old ham'), findsOneWidget);
+    });
+
+    testWidgets("follow the space's notification settings", (tester) async {
+      final api = FakeFridgesApi()
+        ..thresholds = (dangerDays: 0, warningDays: 12);
+      await pumpDashboard(tester, fridges: api);
+      // Within the 12 day warning, so the eggs need eating soon too.
+      expect(find.text('Fine for a while'), findsNothing);
+      expect(find.text('Expiring 3'), findsOneWidget);
+    });
+  });
+
+  testWidgets('tapping a card shows its details, and moves it', (tester) async {
+    await pumpDashboard(tester);
+    await tester.tap(find.text('Free-range eggs'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Eggs (in shell)', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Mark opened'), findsOneWidget);
+
+    await tester.tap(find.text('Move to Freezer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Free-range eggs'), findsNothing);
+    expect(find.text('Free-range eggs moved to Freezer'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Free-range eggs'), findsOneWidget);
+
+    // Opened food can't be opened again.
+    await tester.tap(find.text('Whole milk'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mark opened'), findsNothing);
+  });
+
+  testWidgets('search also finds the kind of food', (tester) async {
+    await pumpDashboard(tester);
+    await tester.enterText(find.byType(TextField), 'shell'); // Eggs (in shell)
+    await tester.pumpAndSettle();
+    expect(find.text('Free-range eggs'), findsOneWidget);
+    expect(find.text('Whole milk'), findsNothing);
+  });
+
+  testWidgets('an empty storage offers to add food', (tester) async {
+    await pumpDashboard(tester);
+    await tester.tap(find.text('Pantry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add food here'), findsOneWidget);
   });
 }

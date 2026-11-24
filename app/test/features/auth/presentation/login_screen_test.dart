@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes.dart';
+import '../../fridges/fakes.dart';
 
 void main() {
   late FakeAuthClient api;
@@ -25,6 +26,7 @@ void main() {
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(google),
+          ...fridgeOverrides(),
         ],
         child: const FridgeFriendApp(),
       ),
@@ -87,7 +89,7 @@ void main() {
         confirmation: 'correct-horse',
       );
 
-      expect(find.text('First dibs'), findsOneWidget);
+      expect(find.text('Add manual'), findsOneWidget);
     });
 
     testWidgets('stops when the passwords differ', (tester) async {
@@ -98,7 +100,7 @@ void main() {
       );
 
       expect(find.text("Passwords don't match"), findsOneWidget);
-      expect(find.text('First dibs'), findsNothing);
+      expect(find.text('Add manual'), findsNothing);
     });
   });
 

@@ -34,6 +34,11 @@ enum FoodCategory {
 /// How soon something needs eating, which colours its card.
 enum ExpiryUrgency { soon, upcoming, later }
 
+/// Days left at which food is [ExpiryUrgency.soon] / upcoming: the fridge
+/// space's expiry notification settings, by default the backend's.
+typedef ExpiryThresholds = ({int dangerDays, int warningDays});
+const defaultThresholds = (dangerDays: 1, warningDays: 6);
+
 /// One thing in a fridge, freezer or pantry.
 class FoodItem {
   const FoodItem({
@@ -129,11 +134,29 @@ class FoodItem {
     FoodCategory.other: 5,
   };
 
-  ExpiryUrgency urgency(DateTime today) => switch (daysLeft(today)) {
-    <= 2 => ExpiryUrgency.soon,
-    <= 5 => ExpiryUrgency.upcoming,
+  ExpiryUrgency urgency(
+    DateTime today, [
+    ExpiryThresholds t = defaultThresholds,
+  ]) => switch (daysLeft(today)) {
+    final d when d <= t.dangerDays => ExpiryUrgency.soon,
+    final d when d <= t.warningDays => ExpiryUrgency.upcoming,
     _ => ExpiryUrgency.later,
   };
+
+  bool isExpired(DateTime today) => daysLeft(today) < 0;
+
+  FoodItem movedTo(StorageLocation to) => FoodItem(
+    id: id,
+    name: name,
+    amount: amount,
+    category: category,
+    productCategory: productCategory,
+    productType: productType,
+    storage: to,
+    bestBefore: bestBefore,
+    openedOn: openedOn,
+    openedExpiresOn: openedExpiresOn,
+  );
 
   // UTC, so a daylight saving change can't make a day 23 hours long.
   static DateTime _dateOnly(DateTime d) => DateTime.utc(d.year, d.month, d.day);
