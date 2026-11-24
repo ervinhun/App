@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoDialogAction;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoDialogAction;
+import 'package:material_ui/material_ui.dart';
 
 /// A native alert saying expiry reminders stay off until notifications are
 /// allowed. Returns true if the user chose to open the system settings.
