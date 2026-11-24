@@ -2,8 +2,7 @@ name: CI
 
 # Adapted from docs/ci-cd/flutter-ci-cd in the Final project repo. The Flutter
 # project lives in app/, not the repo root, hence the working-directory below.
-# Test running is temporarily switched off (RUN_TESTS) until the team
-# actually starts writing tests — flip it to 'true' when ready.
+# Runs on PRs/pushes to main and development; set RUN_TESTS to 'false' to skip tests.
 #
 # gen-l10n / build_runner codegen steps are left out for now since no
 # l10n.yaml or freezed/drift sources exist yet; add them back once those are
@@ -12,12 +11,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, development]
   push:
-    branches: [main]
+    branches: [main, development]
 
 env:
-  RUN_TESTS: 'false'
+  RUN_TESTS: 'true'
 
 defaults:
   run:
