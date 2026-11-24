@@ -39,7 +39,9 @@ class FeatureFlags {
     };
     try {
       final res = await _dio.get<List<dynamic>>(
-        '$url/features/$apiKey',
+        // The path-style `/features/<key>` is an SSE stream (406 for JSON).
+        '$url/features',
+        queryParameters: {'apiKey': apiKey},
         // FeatureHub's context header: key=value,key=value (values url-encoded).
         options: Options(
           headers: {

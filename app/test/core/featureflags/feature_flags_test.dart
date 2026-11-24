@@ -30,7 +30,7 @@ void main() {
 
   test('reads the flag and sends the context header', () async {
     expect(await flags.isEnabled('createContainer', userKey: 'u 1', country: 'hungary'), isTrue);
-    expect(hub.last!.uri.toString(), 'http://hub/features/k');
+    expect(hub.last!.uri.toString(), 'http://hub/features?apiKey=k');
     expect(hub.last!.headers['x-featurehub'], 'userkey=u%201,country=hungary');
     expect(await flags.isEnabled('off'), isFalse);
     expect(await flags.isEnabled('missing'), isFalse);
