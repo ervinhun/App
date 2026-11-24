@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_config.dart';
@@ -17,6 +18,9 @@ class FeatureFlags {
   final Dio _dio;
   final String url;
   final String apiKey;
+
+  /// When FeatureHub last answered successfully; null until then.
+  DateTime? lastFetched;
 
   /// Same contract as the backend's `IsEnabledAsync`. Returns false when
   /// FeatureHub isn't configured or can't be reached, so a flag never breaks the app.
@@ -51,6 +55,7 @@ class FeatureFlags {
           },
         ),
       );
+      lastFetched = DateTime.now();
       // Response: one entry per environment, each a list of features.
       for (final env in res.data ?? const []) {
         for (final f in (env['features'] as List? ?? const [])) {
@@ -91,4 +96,19 @@ final featureEnabledProvider = FutureProvider.family<bool, String>((
           _ => null,
         },
       );
+});
+
+/// Refetches flags on return to the foreground if the last successful fetch
+/// is 12h+ old. Watch it once near the root (see `FridgeFriendApp`).
+final featureFlagRefreshProvider = Provider<void>((ref) {
+  final listener = AppLifecycleListener(
+    onResume: () {
+      final last = ref.read(featureFlagsProvider).lastFetched;
+      if (last == null ||
+          DateTime.now().difference(last) >= const Duration(hours: 12)) {
+        ref.invalidate(featureEnabledProvider);
+      }
+    },
+  );
+  ref.onDispose(listener.dispose);
 });
