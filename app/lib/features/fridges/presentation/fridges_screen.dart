@@ -1,8 +1,8 @@
+
 import 'package:app/core/featureflags/feature_flags.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-
 import 'package:app/core/api/api_client.dart';
 import 'package:app/features/notifications/presentation/notifications_controller.dart';
 import 'package:app/features/notifications/presentation/notifications_off_dialog.dart';

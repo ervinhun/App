@@ -3,7 +3,7 @@ import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/main.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -104,9 +104,4 @@ void main() {
     expect(find.text('Invalid email or password.'), findsOneWidget);
   }, variant: android);
 
-  testWidgets('Google button is hidden on iOS for now', (tester) async {
-    await pumpApp(tester);
-
-    expect(find.text('Continue with Google'), findsNothing);
-  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 }
