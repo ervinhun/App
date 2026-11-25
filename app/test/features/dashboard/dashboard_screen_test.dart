@@ -7,7 +7,7 @@ import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:app/features/food/data/sample_food.dart';
 import 'package:app/features/food/domain/food_item.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

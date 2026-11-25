@@ -1,0 +1,60 @@
+import 'package:flutter/foundation.dart';
+
+/// ISO 3166-1 code -> the name FeatureHub's country strategy expects.
+/// Europe, plus the US. Turkey and Cyprus are in; Georgia, Armenia, Azerbaijan
+/// and Kazakhstan are not. A code that isn't listed sends no country.
+const featureHubCountries = {
+  'AL': 'albania',
+  'AD': 'andorra',
+  'AT': 'austria',
+  'BY': 'belarus',
+  'BE': 'belgium',
+  'BA': 'bosnia_and_herzegovina',
+  'BG': 'bulgaria',
+  'HR': 'croatia',
+  'CY': 'cyprus',
+  'CZ': 'czech_republic',
+  'DK': 'denmark',
+  'EE': 'estonia',
+  'FI': 'finland',
+  'FR': 'france',
+  'DE': 'germany',
+  'GR': 'greece',
+  'HU': 'hungary',
+  'IS': 'iceland',
+  'IE': 'ireland',
+  'IT': 'italy',
+  'XK': 'kosovo',
+  'LV': 'latvia',
+  'LI': 'liechtenstein',
+  'LT': 'lithuania',
+  'LU': 'luxembourg',
+  'MT': 'malta',
+  'MD': 'moldova',
+  'MC': 'monaco',
+  'ME': 'montenegro',
+  'NL': 'netherlands',
+  'MK': 'north_macedonia',
+  'NO': 'norway',
+  'PL': 'poland',
+  'PT': 'portugal',
+  'RO': 'romania',
+  'RU': 'russia',
+  'SM': 'san_marino',
+  'RS': 'serbia',
+  'SK': 'slovakia',
+  'SI': 'slovenia',
+  'ES': 'spain',
+  'SE': 'sweden',
+  'CH': 'switzerland',
+  'TR': 'turkey',
+  'UA': 'ukraine',
+  'GB': 'united_kingdom',
+  'VA': 'vatican_city',
+  'US': 'united_states',
+};
+
+/// The region set on the phone (Settings > Language & region). Needs no permission,
+/// but it is the user's setting, not where they physically are.
+String? deviceCountry() =>
+    featureHubCountries[PlatformDispatcher.instance.locale.countryCode];

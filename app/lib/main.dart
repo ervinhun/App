@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_config.dart';
+import 'package:app/core/featureflags/feature_flags.dart';
 import 'package:app/core/router/app_router.dart';
 import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/core/theme/app_theme.dart';
@@ -26,6 +27,7 @@ class FridgeFriendApp extends ConsumerWidget {
     ref.listen(foodItemsProvider, (_, _) {});
     // Sends changes when the connection comes back, whichever tab is open.
     ref.listen(syncControllerProvider, (_, _) {});
+    ref.watch(featureFlagRefreshProvider);
     return MaterialApp.router(
       title: 'FridgeFriend',
       theme: AppTheme.light,

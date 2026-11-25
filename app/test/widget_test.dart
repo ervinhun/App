@@ -10,7 +10,7 @@ import 'package:app/features/notifications/data/notification_api.dart';
 import 'package:app/features/notifications/data/notification_service.dart';
 import 'package:app/features/notifications/data/reminders_storage.dart';
 import 'package:app/main.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
