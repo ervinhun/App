@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_config.dart';
+import 'package:app/core/featureflags/feature_flags.dart';
 import 'package:app/core/router/app_router.dart';
 import 'package:app/core/theme/app_theme.dart';
 
@@ -15,6 +16,7 @@ class FridgeFriendApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(featureFlagRefreshProvider);
     return MaterialApp.router(
       title: 'FridgeFriend',
       theme: AppTheme.light,

@@ -43,6 +43,12 @@ abstract final class ApiConfig {
     'GOOGLE_IOS_CLIENT_ID',
   );
 
+  /// FeatureHub Edge URL and a *server-evaluated* API key (the key goes into the
+  /// app, so use a client-side-safe key, never an admin one). Both optional:
+  /// without them every flag reads as off.
+  static const featureHubUrl = String.fromEnvironment('FEATUREHUB_URL');
+  static const featureHubApiKey = String.fromEnvironment('FEATUREHUB_API_KEY');
+
   /// Throws if required configuration is missing, so a bad build fails on launch
   /// instead of when someone first taps the Google button.
   static void validate() => googleServerClientId;

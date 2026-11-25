@@ -1,7 +1,8 @@
+
+import 'package:app/core/featureflags/feature_flags.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-
 import 'package:app/core/api/api_client.dart';
 import 'package:app/features/notifications/presentation/notifications_controller.dart';
 import 'package:app/features/notifications/presentation/notifications_off_dialog.dart';
@@ -52,6 +53,16 @@ class FridgesScreen extends ConsumerWidget {
             icon: const Icon(LucideIcons.bellRing),
             label: const Text('Send test notification'),
           ),
+          if (ref.watch(featureEnabledProvider('test1')).value ?? false)
+            FilledButton.icon(
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) =>
+                    const AlertDialog(content: Text('This is enabled')),
+              ),
+              icon: const Icon(LucideIcons.circleCheck),
+              label: const Text('Feature test1 is enabled'),
+            ),
         ],
       ),
     ),
