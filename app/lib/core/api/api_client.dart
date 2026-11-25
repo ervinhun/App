@@ -61,9 +61,6 @@ class ApiException implements Exception {
 
   bool get isUnauthorized => statusCode == 401;
 
-  /// The backend couldn't be reached at all.
-  bool get isOffline => statusCode == null;
-
   /// Reads the backend's ProblemDetails body (`detail`, `title`, or the first
   /// validation error) when there is one.
   factory ApiException.fromDio(DioException e) {

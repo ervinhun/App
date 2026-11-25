@@ -12,9 +12,9 @@ import 'package:app/features/food/data/food_store.dart';
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
 ///
-/// Offline, a stored session counts as signed in, as the user it was for: the
-/// app works offline, and the backend checks the token again on the next
-/// request that reaches it.
+/// Offline, or while the backend is down, a stored session counts as signed in,
+/// as the user it was for: the app works offline, and the backend checks the
+/// token again on the next request that reaches it.
 ///
 /// Sign-in methods throw [ApiException] (or a Google SDK error) on failure and
 /// leave the state unchanged, so screens can show the error themselves.
@@ -40,9 +40,7 @@ class AuthController extends AsyncNotifier<UserDto?> {
         await _tokens.clear();
         return null;
       }
-      if (e.isOffline) {
-        if (await _tokens.readUser() case final user?) return user;
-      }
+      if (await _tokens.readUser() case final user?) return user;
       rethrow;
     }
   }

@@ -42,10 +42,35 @@ class TokenStorage {
     await _storage.write(key: _accessTokenKey, value: accessToken);
   }
 
-  /// The user the tokens belong to, as the backend last returned them. Null
-  /// if what's saved can't be read, e.g. from an older app version: the
-  /// next check with the backend saves them again.
-  Future<UserDto?> readUser() async {
+  /// The user the tokens belong to, as the backend last returned them. If none
+  /// is saved or it can't be read, e.g. after signing in with an older app
+  /// version, the one the access token was issued for: the next check with the
+  /// backend saves them again.
+  Future<UserDto?> readUser() async =>
+      await _readSavedUser() ?? _userOf(await read());
+
+  /// Reads the claims without checking the token, also when it has expired:
+  /// the backend checks it on every request.
+  static UserDto? _userOf(String? accessToken) {
+    if (accessToken == null) return null;
+    try {
+      final payload = base64Url.normalize(accessToken.split('.')[1]);
+      final claims = jsonDecode(
+        utf8.decode(base64Url.decode(payload)),
+      ) as Map<String, dynamic>;
+      return UserDto(
+        id: claims['sub'] as String,
+        email: claims['email'] as String,
+        displayName: claims['name'] as String,
+        locale: claims['locale'] as String,
+      );
+    } catch (e) {
+      debugPrint('Could not read the user from the access token: $e');
+      return null;
+    }
+  }
+
+  Future<UserDto?> _readSavedUser() async {
     final json = await _storage.read(key: _userKey);
     if (json == null) return null;
     try {
