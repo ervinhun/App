@@ -30,7 +30,8 @@ class NotificationsController {
       fridgeId: '',
       settings: const NotificationSettings(),
       items: [
-        for (final item in _ref.read(foodItemsProvider))
+        // Empty while the food is read; the listener updates once it's there.
+        for (final item in _ref.read(foodItemsProvider).value ?? const [])
           ReminderItem(
             id: item.id,
             expiresOn: item.expiresOn,

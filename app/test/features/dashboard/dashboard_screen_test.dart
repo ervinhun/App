@@ -1,6 +1,8 @@
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
+import 'package:app/core/sync/connectivity.dart';
 import 'package:app/core/api/api_client.dart';
+import 'package:app/core/widgets/loading_screen.dart';
 import 'package:app/features/auth/data/google_auth.dart';
 import 'package:app/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:app/features/food/data/sample_food.dart';
@@ -11,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../core/db/test_database.dart';
 import '../../core/storage/fake_hint_storage.dart';
 import '../auth/fakes.dart';
 
@@ -69,6 +72,7 @@ void main() {
   Future<void> pumpDashboard(
     WidgetTester tester, {
     HintStorage? hints,
+    bool online = true,
     bool settle = true,
   }) async {
     tester.view.physicalSize = const Size(430, 2000);
@@ -78,6 +82,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(FakeTokenStorage('jwt')),
           authClientProvider.overrideWithValue(FakeAuthClient()),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
@@ -85,6 +90,7 @@ void main() {
           hintStorageProvider.overrideWithValue(
             hints ?? FakeHintStorage(swipeDone: true),
           ),
+          networkAvailableProvider.overrideWith((ref) => Stream.value(online)),
         ],
         child: const MaterialApp(home: DashboardScreen()),
       ),
@@ -95,6 +101,36 @@ void main() {
   // The expiry sticker on opened food, e.g. "8 Nov → 4 Nov".
   final stickers = find.textContaining('→');
   final tip = find.textContaining('swipe a card', findRichText: true);
+
+  testWidgets('shows the loading screen until the food is read', (
+    tester,
+  ) async {
+    await pumpDashboard(tester, settle: false);
+
+    expect(find.byType(LoadingScreen), findsOneWidget);
+    expect(find.text('Nothing in here yet.'), findsNothing);
+
+    await tester.pumpAndSettle();
+    expect(find.byType(LoadingScreen), findsNothing);
+    expect(find.text('Chicken breasts'), findsOneWidget);
+  });
+
+  testWidgets('offline, says changes still count', (tester) async {
+    await pumpDashboard(tester, online: false);
+
+    expect(find.textContaining("You're offline"), findsOneWidget);
+
+    // Marked opened: saved on the phone, waiting for the backend.
+    await tester.drag(find.text('Chicken breasts'), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 change is waiting'), findsOneWidget);
+  });
+
+  testWidgets('online, shows no offline banner', (tester) async {
+    await pumpDashboard(tester);
+
+    expect(find.textContaining("You're offline"), findsNothing);
+  });
 
   testWidgets('lists the fridge, soonest to expire first', (tester) async {
     await pumpDashboard(tester);

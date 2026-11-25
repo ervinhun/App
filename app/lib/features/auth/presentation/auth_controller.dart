@@ -6,9 +6,15 @@ import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/apple_auth.dart';
 import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
+import 'package:app/features/food/data/food_store.dart';
 
 /// Who is signed in: `null` when signed out, loading while a stored token is
 /// checked on startup.
+///
+/// Offline, or while the backend is down, a stored session counts as signed in,
+/// as the user it was for: the app works offline, and the backend checks the
+/// token again on the next request that reaches it.
 ///
 /// Sign-in methods throw [ApiException] (or a Google SDK error) on failure and
 /// leave the state unchanged, so screens can show the error themselves.
@@ -25,13 +31,16 @@ class AuthController extends AsyncNotifier<UserDto?> {
     await _tokens.migrateAccessibility();
     if (await _tokens.read() == null) return null;
     try {
-      return await apiCall(_api.me());
+      final user = await apiCall(_api.me());
+      await _tokens.writeUser(user);
+      return user;
     } on ApiException catch (e) {
       // The session ended, or the account was deleted.
       if (e.isUnauthorized) {
         await _tokens.clear();
         return null;
       }
+      if (await _tokens.readUser() case final user?) return user;
       rethrow;
     }
   }
@@ -119,8 +128,13 @@ class AuthController extends AsyncNotifier<UserDto?> {
   /// Signs out on this device only, for when the backend already ended the
   /// session. Unlike [signOut] it sends no request, so `AuthInterceptor` can
   /// call it while a refresh is in flight.
+  ///
+  /// The food stays on the phone, with its changes not uploaded yet, for
+  /// using the app offline as a guest; see `FoodStore.claimFor` for what the
+  /// next sign-in does with it.
   Future<void> endSession() async {
     final google = ref.read(googleAuthProvider);
+    await ref.read(foodStoreProvider).markSignedOut();
     await _tokens.clear();
     state = const AsyncData(null);
     // Cancels a startup check still running, whose late result would undo this.
@@ -133,6 +147,8 @@ class AuthController extends AsyncNotifier<UserDto?> {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
     );
+    await _tokens.writeUser(session.user);
+    await ref.read(guestModeProvider.notifier).leave();
     state = AsyncData(session.user);
   }
 }

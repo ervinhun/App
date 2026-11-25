@@ -2,33 +2,41 @@ import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/core/storage/hint_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
+import 'package:app/features/food/data/food_items_controller.dart';
+import 'package:app/features/food/data/product_catalog_api.dart';
+import 'package:app/features/notifications/data/background_refresh.dart';
+import 'package:app/features/notifications/data/notification_api.dart';
+import 'package:app/features/notifications/data/notification_service.dart';
+import 'package:app/features/notifications/data/reminders_storage.dart';
 import 'package:app/main.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:app/features/notifications/data/background_refresh.dart';
-import 'package:app/features/notifications/data/notification_api.dart';
-import 'package:app/features/notifications/data/notification_service.dart';
-import 'package:app/features/notifications/data/reminders_storage.dart';
-
+import 'core/db/test_database.dart';
 import 'core/storage/fake_hint_storage.dart';
 import 'features/notifications/fakes.dart';
 import 'features/auth/fakes.dart';
+import 'features/food/food_store_test.dart' show food;
 
 void main() {
   late FakeTokenStorage tokens;
   late FakeAuthClient api;
+  late FakeGuestStorage guests;
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
           googleAuthProvider.overrideWithValue(FakeGoogleAuth()),
           hintStorageProvider.overrideWithValue(FakeHintStorage()),
+          guestStorageProvider.overrideWithValue(guests),
+          productTypesProvider.overrideWith((ref) => Stream.value(const [])),
           notificationServiceProvider.overrideWithValue(
             FakeNotificationService(),
           ),
@@ -47,6 +55,7 @@ void main() {
   setUp(() {
     tokens = FakeTokenStorage();
     api = FakeAuthClient();
+    guests = FakeGuestStorage();
   });
 
   // The variant sets and resets debugDefaultTargetPlatformOverride; resetting it in
@@ -56,7 +65,7 @@ void main() {
   testWidgets('signed out: shows the login screen', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Continue with email'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
   }, variant: android);
 
@@ -66,6 +75,46 @@ void main() {
 
     expect(find.text('First dibs'), findsOneWidget);
     expect(find.textContaining('HELLO, ANNA!'), findsOneWidget);
+  }, variant: android);
+
+  testWidgets('offline with a stored session: goes straight to home', (
+    tester,
+  ) async {
+    tokens
+      ..token = 'jwt'
+      ..user = anna;
+    api.meResult = ApiException("Can't reach the server.");
+    await pumpApp(tester);
+
+    expect(find.text('First dibs'), findsOneWidget);
+    expect(find.textContaining('HELLO, ANNA!'), findsOneWidget);
+  }, variant: android);
+
+  testWidgets('Continue as guest opens the app; You offers signing in', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+    expect(find.text('First dibs'), findsOneWidget);
+    expect(guests.guest, isTrue);
+
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('as a guest'), findsOneWidget);
+
+    await tester.tap(find.text('Sign in or create an account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(guests.guest, isFalse);
+  }, variant: android);
+
+  testWidgets('a guest stays a guest after a restart', (tester) async {
+    guests.guest = true;
+    await pumpApp(tester);
+
+    expect(find.text('First dibs'), findsOneWidget);
   }, variant: android);
 
   testWidgets('Continue with Google signs in, sign out returns to login', (
@@ -86,12 +135,75 @@ void main() {
     expect(find.text('Continue with Google'), findsOneWidget);
   }, variant: android);
 
+  testWidgets('signing out keeps the food, for using the app as a guest', (
+    tester,
+  ) async {
+    tokens.token = 'jwt';
+    await pumpApp(tester);
+    expect(find.text('Chicken breasts'), findsOneWidget);
+
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sign out'));
+    await tester.pumpAndSettle();
+    expect(tokens.token, isNull);
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chicken breasts'), findsOneWidget);
+  }, variant: android);
+
+  /// A guest adds food, then signs in with Google, and is asked about it.
+  Future<void> addAsGuestThenSignIn(WidgetTester tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Continue as guest'));
+    await tester.pumpAndSettle();
+    ProviderScope.containerOf(tester.element(find.byType(FridgeFriendApp)))
+        .read(foodItemsProvider.notifier)
+        .add(food('a', name: 'Oat milk'));
+    await tester.pumpAndSettle();
+    expect(find.text('Oat milk'), findsOneWidget);
+
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in or create an account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue with Google'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add food to your account?'), findsOneWidget);
+  }
+
+  testWidgets("signing in asks to add a guest's food, and adds it", (
+    tester,
+  ) async {
+    await addAsGuestThenSignIn(tester);
+
+    await tester.tap(find.text('Add to account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add food to your account?'), findsNothing);
+    expect(find.text('Oat milk'), findsOneWidget);
+  }, variant: android);
+
+  testWidgets("signing in asks to add a guest's food, and can keep it", (
+    tester,
+  ) async {
+    await addAsGuestThenSignIn(tester);
+
+    await tester.tap(find.text('Keep on this phone'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oat milk'), findsNothing);
+  }, variant: android);
+
   testWidgets('a backend error is shown on the login screen', (tester) async {
     api.signInError = ApiException(
       'Invalid email or password.',
       statusCode: 401,
     );
     await pumpApp(tester);
+    await tester.tap(find.text('Continue with email'));
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.byType(TextFormField).at(0),
@@ -104,4 +216,10 @@ void main() {
     expect(find.text('Invalid email or password.'), findsOneWidget);
   }, variant: android);
 
+  testWidgets('iOS offers Apple next to Google', (tester) async {
+    await pumpApp(tester);
+
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Continue with Apple'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 }

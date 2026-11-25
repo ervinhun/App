@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:app/core/router/home_shell.dart';
+import 'package:app/core/widgets/loading_screen.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
 import 'package:app/features/auth/presentation/login_screen.dart';
 import 'package:app/features/auth/presentation/startup_error_screen.dart';
@@ -29,13 +31,14 @@ abstract final class Routes {
   static const addFood = '/add-food';
 }
 
-/// Sends signed-out users to the login screen and signed-in users away from it.
+/// Sends signed-out users to the login screen, and signed-in users and guests
+/// away from it.
 final routerProvider = Provider<GoRouter>((ref) {
-  // Re-runs `redirect` whenever the auth state changes.
-  final authChanges = ValueNotifier<AsyncValue<Object?>>(
-    ref.read(authControllerProvider),
-  );
-  ref.listen(authControllerProvider, (_, next) => authChanges.value = next);
+  // Re-runs `redirect` whenever the auth state or guest mode changes.
+  final authChanges = ValueNotifier<Object>(Object());
+  void changed(Object? _, Object? _) => authChanges.value = Object();
+  ref.listen(authControllerProvider, changed);
+  ref.listen(guestModeProvider, changed);
   ref.onDispose(authChanges.dispose);
 
   final router = GoRouter(
@@ -43,16 +46,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: authChanges,
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
+      final guest = ref.read(guestModeProvider);
       final at = state.matchedLocation;
       // Couldn't check the stored token. The user may still be signed in.
       if (auth.hasError && !auth.hasValue) {
         return at == Routes.startupError ? null : Routes.startupError;
       }
-      // Still checking the stored token on startup.
-      if (auth.isLoading && !auth.hasValue) {
+      // Still checking the stored token, or reading guest mode, on startup.
+      if ((auth.isLoading && !auth.hasValue) || !guest.hasValue) {
         return at == Routes.splash ? null : Routes.splash;
       }
-      final signedIn = auth.value != null;
+      final signedIn = auth.value != null || guest.value!;
       if (!signedIn) return at == Routes.login ? null : Routes.login;
       return (at == Routes.login ||
               at == Routes.splash ||
@@ -61,11 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           : null;
     },
     routes: [
-      GoRoute(
-        path: Routes.splash,
-        builder: (_, _) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
-      ),
+      GoRoute(path: Routes.splash, builder: (_, _) => const LoadingScreen()),
       GoRoute(path: Routes.login, builder: (_, _) => const LoginScreen()),
       GoRoute(
         path: Routes.startupError,

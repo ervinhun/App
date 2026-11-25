@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../features/auth/fakes.dart';
+import '../db/test_database.dart';
 
 const _fridges = '/api/fridges';
 const _slow = '/api/slow';
@@ -149,6 +150,7 @@ void main() {
     final c = ProviderContainer.test(
       retry: retry,
       overrides: [
+        inMemoryDatabase(),
         tokenStorageProvider.overrideWithValue(tokens),
         googleAuthProvider.overrideWithValue(google),
         signInClientProvider.overrideWithValue(

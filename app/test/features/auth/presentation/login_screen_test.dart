@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/db/test_database.dart';
 import '../fakes.dart';
 
 void main() {
@@ -21,6 +22,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(FakeTokenStorage()),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
@@ -38,7 +40,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder field(String label) => find.widgetWithText(TextFormField, label);
+  /// The text field under [label].
+  Finder field(String label) => find.descendant(
+    of: find
+        .ancestor(of: find.text(label), matching: find.byType(Column))
+        .first,
+    matching: find.byType(TextFormField),
+  );
 
   Future<void> tap(WidgetTester tester, String text) async {
     await tester.ensureVisible(find.text(text));
@@ -52,6 +60,7 @@ void main() {
     required String confirmation,
   }) async {
     await pumpApp(tester);
+    await tap(tester, 'Continue with email');
     await tap(tester, 'New here? Create an account');
     await tester.enterText(field('Name'), 'Anna');
     await tester.enterText(field('Email'), 'anna@example.com');
@@ -71,7 +80,8 @@ void main() {
   group('registering', () {
     testWidgets('asks to confirm the password', (tester) async {
       await pumpApp(tester);
-      expect(field('Confirm password'), findsNothing);
+      await tap(tester, 'Continue with email');
+      expect(find.text('Confirm password'), findsNothing);
 
       await tap(tester, 'New here? Create an account');
 
@@ -100,6 +110,21 @@ void main() {
       expect(find.text("Passwords don't match"), findsOneWidget);
       expect(find.text('First dibs'), findsNothing);
     });
+  });
+
+  testWidgets('Continue with email opens the form, and back closes it', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    expect(find.text('Email'), findsNothing);
+
+    await tap(tester, 'Continue with email');
+    expect(field('Email'), findsOneWidget);
+    expect(field('Password'), findsOneWidget);
+
+    await tap(tester, 'Other ways to sign in');
+    expect(find.text('Email'), findsNothing);
+    expect(find.text('Continue with Google'), findsOneWidget);
   });
 
   testWidgets('hides the details of any other error', (tester) async {

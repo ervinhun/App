@@ -4,6 +4,7 @@ import 'package:app/core/api/api_client.dart';
 import 'package:app/core/api/generated/export.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
 
 const anna = UserDto(
   id: '00000000-0000-0000-0000-000000000001',
@@ -12,14 +13,35 @@ const anna = UserDto(
   locale: 'en',
 );
 
+class FakeGuestStorage implements GuestStorage {
+  FakeGuestStorage([this.guest = false]);
+
+  bool guest;
+
+  @override
+  Future<bool> isGuest() async => guest;
+
+  @override
+  Future<void> setGuest(bool guest) async => this.guest = guest;
+}
+
 class FakeTokenStorage extends TokenStorage {
   FakeTokenStorage([this.token, this.refreshToken]);
 
   String? token;
   String? refreshToken;
 
+  /// The user stored with the tokens, for starting offline.
+  UserDto? user;
+
   @override
   Future<String?> read() async => token;
+
+  @override
+  Future<UserDto?> readUser() async => user;
+
+  @override
+  Future<void> writeUser(UserDto user) async => this.user = user;
 
   @override
   Future<String?> readRefreshToken() async => refreshToken;
@@ -37,6 +59,7 @@ class FakeTokenStorage extends TokenStorage {
   Future<void> clear() async {
     token = null;
     refreshToken = null;
+    user = null;
   }
 }
 

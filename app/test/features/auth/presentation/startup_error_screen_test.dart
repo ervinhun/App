@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/db/test_database.dart';
 import '../fakes.dart';
 
 const _offlineMessage = "Can't reach the server.";
@@ -31,6 +32,7 @@ void main() {
       ProviderScope(
         retry: autoRetry ? null : (_, _) => null,
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),
@@ -44,7 +46,7 @@ void main() {
 
   void expectStartupError() {
     expect(find.text('Try again'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Continue with email'), findsNothing);
   }
 
   testWidgets('starting offline offers a retry, not the login form', (
@@ -100,7 +102,7 @@ void main() {
       await tester.tap(find.text('Try again'));
       await pumpABit(tester);
 
-      expect(find.byType(TextFormField), findsWidgets);
+      expect(find.text('Continue with email'), findsOneWidget);
       expect(tokens.token, isNull);
     });
   });
@@ -111,7 +113,7 @@ void main() {
     await tester.tap(find.text('Sign out'));
     await pumpABit(tester);
 
-    expect(find.byType(TextFormField), findsWidgets);
+    expect(find.text('Continue with email'), findsOneWidget);
     expect(tokens.token, isNull);
     expect(tokens.refreshToken, isNull);
   });

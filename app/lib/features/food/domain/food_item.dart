@@ -75,6 +75,20 @@ class FoodItem {
   /// The earlier date it must be eaten by once opened.
   final DateTime? openedExpiresOn;
 
+  /// The same item under a new [id].
+  FoodItem withId(String id) => FoodItem(
+    id: id,
+    name: name,
+    amount: amount,
+    category: category,
+    productCategory: productCategory,
+    productType: productType,
+    storage: storage,
+    bestBefore: bestBefore,
+    openedOn: openedOn,
+    openedExpiresOn: openedExpiresOn,
+  );
+
   IconData get icon =>
       FoodIcons.forType(category: productCategory, type: productType);
 

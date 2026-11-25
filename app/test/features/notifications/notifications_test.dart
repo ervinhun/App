@@ -14,6 +14,7 @@ import 'package:app/features/notifications/domain/fridge_reminders.dart';
 import 'package:app/features/notifications/domain/notification_settings.dart';
 import 'package:app/features/notifications/presentation/notifications_controller.dart';
 
+import '../../core/db/test_database.dart';
 import 'fakes.dart';
 
 FridgeReminders _fridge({int expiresInDays = 7}) {
@@ -333,6 +334,7 @@ void main() {
     ProviderContainer container() {
       final c = ProviderContainer(
         overrides: [
+          inMemoryDatabase(),
           notificationServiceProvider.overrideWithValue(service),
           backgroundRefreshProvider.overrideWithValue(FakeBackgroundRefresh()),
           remindersStorageProvider.overrideWithValue(FakeRemindersStorage()),

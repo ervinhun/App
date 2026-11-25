@@ -3,23 +3,32 @@ import 'dart:async';
 import 'package:app/core/api/api_client.dart';
 import 'package:app/core/auth/token_storage.dart';
 import 'package:app/features/auth/data/google_auth.dart';
+import 'package:app/features/auth/data/guest_mode.dart';
 import 'package:app/features/auth/presentation/auth_controller.dart';
+import 'package:app/features/food/data/food_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../core/auth/token_storage_test.dart' show annasToken;
+import '../../../core/db/test_database.dart';
+import '../../food/food_store_test.dart' show food;
 import '../fakes.dart';
 
 void main() {
   late FakeTokenStorage tokens;
   late FakeAuthClient api;
   late FakeGoogleAuth google;
+  late FakeGuestStorage guests;
 
   ProviderContainer container() => ProviderContainer.test(
     overrides: [
+      inMemoryDatabase(),
       tokenStorageProvider.overrideWithValue(tokens),
       authClientProvider.overrideWithValue(api),
       signInClientProvider.overrideWithValue(api),
       googleAuthProvider.overrideWithValue(google),
+      guestStorageProvider.overrideWithValue(guests),
     ],
   );
 
@@ -27,6 +36,21 @@ void main() {
     tokens = FakeTokenStorage();
     api = FakeAuthClient();
     google = FakeGoogleAuth();
+    guests = FakeGuestStorage();
+  });
+
+  test('when the backend ends the session, the food is kept', () async {
+    tokens.token = 'jwt';
+    final c = container();
+    await c.read(authControllerProvider.future);
+    final store = c.read(foodStoreProvider);
+    await store.claimFor(anna.id);
+    await store.save(food('a'), DateTime(2026, 11, 15));
+
+    await c.read(authControllerProvider.notifier).endSession();
+
+    expect([for (final item in await store.items()) item.id], ['a']);
+    expect(await store.pendingCount(), 1);
   });
 
   group('startup', () {
@@ -38,6 +62,54 @@ void main() {
       tokens.token = 'old-jwt';
 
       expect(await container().read(authControllerProvider.future), anna);
+    });
+
+    test('offline, the stored user is signed in', () async {
+      tokens
+        ..token = 'old-jwt'
+        ..user = anna;
+      api.meResult = ApiException("Can't reach the server.");
+
+      expect(await container().read(authControllerProvider.future), anna);
+      expect(tokens.token, 'old-jwt');
+    });
+
+    for (final status in [429, 500, 502, 503]) {
+      test('a $status from the backend signs in the stored user', () async {
+        tokens
+          ..token = 'old-jwt'
+          ..user = anna;
+        api.meResult = ApiException('Unavailable', statusCode: status);
+
+        expect(await container().read(authControllerProvider.future), anna);
+        expect(tokens.token, 'old-jwt');
+      });
+    }
+
+    test(
+      'offline, a session from before users were stored is signed in',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({'access_token': annasToken});
+        api.meResult = ApiException("Can't reach the server.");
+        final c = ProviderContainer.test(
+          retry: (_, _) => null,
+          overrides: [
+            inMemoryDatabase(),
+            tokenStorageProvider.overrideWithValue(TokenStorage()),
+            authClientProvider.overrideWithValue(api),
+          ],
+        );
+
+        expect((await c.read(authControllerProvider.future))?.id, anna.id);
+      },
+    );
+
+    test('online, the user is stored for starting offline', () async {
+      tokens.token = 'old-jwt';
+
+      await container().read(authControllerProvider.future);
+
+      expect(tokens.user, anna);
     });
 
     test('a rejected token is cleared', () async {
@@ -66,7 +138,20 @@ void main() {
       );
       expect(tokens.token, 'backend-jwt');
       expect(tokens.refreshToken, 'backend-refresh');
+      expect(tokens.user, anna);
       expect(c.read(authControllerProvider).value, anna);
+    });
+
+    test('a guest who signs in is a guest no more', () async {
+      guests.guest = true;
+      final c = container();
+      await c.read(authControllerProvider.future);
+      expect(await c.read(guestModeProvider.future), isTrue);
+
+      await c.read(authControllerProvider.notifier).signInWithGoogle();
+
+      expect(c.read(guestModeProvider).value, isFalse);
+      expect(guests.guest, isFalse);
     });
 
     test('closing the account picker changes nothing', () async {
@@ -137,6 +222,7 @@ void main() {
       final c = ProviderContainer.test(
         retry: (_, _) => null,
         overrides: [
+          inMemoryDatabase(),
           tokenStorageProvider.overrideWithValue(tokens),
           authClientProvider.overrideWithValue(api),
           signInClientProvider.overrideWithValue(api),

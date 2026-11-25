@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:app/core/theme/app_colors.dart';
 import 'package:app/core/theme/app_text.dart';
+import 'package:app/core/utils/ids.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/domain/food_item.dart';
 import 'package:app/features/food/domain/product_type.dart';
@@ -126,7 +127,7 @@ class _AddFoodScreenState extends ConsumerState<AddFoodScreen> {
     if (!valid || type == null) return;
 
     final item = FoodItem(
-      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      id: newId(),
       name: _name.text.trim(),
       amount: _amount.text.trim(),
       category: type.group,
