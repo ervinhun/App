@@ -55,7 +55,7 @@ class SyncStatus {
 /// guest's changes stay queued, and are uploaded if they sign in.
 class SyncController extends Notifier<SyncStatus> {
   static const _firstRetry = Duration(seconds: 5);
-  static const _maxRetry = Duration(minutes: 5);
+  static const _maxRetry = Duration(minutes: 1);
 
   Timer? _retryTimer;
   Duration _retryDelay = _firstRetry;
@@ -116,8 +116,8 @@ class SyncController extends Notifier<SyncStatus> {
       return;
     }
     final remote = ref.read(itemsRemoteProvider);
-    final signedIn = ref.read(authControllerProvider).value != null;
-    if (remote == null || !signedIn) return _updatePending();
+    final userId = ref.read(authControllerProvider).value?.id;
+    if (remote == null || userId == null) return _updatePending();
 
     _running = true;
     _retryTimer?.cancel();
@@ -125,11 +125,15 @@ class SyncController extends Notifier<SyncStatus> {
     try {
       do {
         _runAgain = false;
-        await _push(remote);
-        await _pull(remote);
+        await _open(remote);
+        await _push(remote, userId);
+        await _pull(remote, userId);
       } while (_runAgain && ref.mounted);
       _retryDelay = _firstRetry;
       if (ref.mounted) state = state.copyWith(reachable: true);
+    } on _UserChanged {
+      // Whoever signed in gets a sync of their own.
+      _runAgain = true;
     } on _TryLater catch (e) {
       if (ref.mounted) {
         state = state.copyWith(reachable: !e.offline);
@@ -144,30 +148,59 @@ class SyncController extends Notifier<SyncStatus> {
         state = state.copyWith(syncing: false);
         await ref.read(foodItemsProvider.notifier).reload();
         await _updatePending();
+        // The retry does it if this sync failed.
+        if (_runAgain && !(_retryTimer?.isActive ?? false) && ref.mounted) {
+          _runAgain = false;
+          unawaited(syncNow());
+        }
       }
     }
   }
 
-  Future<void> _push(ItemsRemote remote) async {
-    while (ref.mounted) {
+  Future<void> _open(ItemsRemote remote) async {
+    try {
+      await remote.open();
+    } catch (e) {
+      debugPrint('Could not open the fridge: $e');
+      throw _TryLater(offline: e is ApiException && e.statusCode == null);
+    }
+  }
+
+  /// Stops a sync that outlived its user: the food on the phone is someone
+  /// else's now, or about to be.
+  void _checkUser(String userId) {
+    if (!ref.mounted ||
+        _claiming ||
+        ref.read(authControllerProvider).value?.id != userId) {
+      throw const _UserChanged();
+    }
+  }
+
+  Future<void> _push(ItemsRemote remote, String userId) async {
+    while (true) {
       final change = await _store.nextChange();
+      _checkUser(userId);
       if (change == null) return;
       try {
         switch (change.kind) {
           case ChangeKind.delete:
             await remote.delete(change.itemId, changedAt: change.changedAt);
+            _checkUser(userId);
             await _store.completeChange(change);
           case ChangeKind.save:
             final item = await _store.item(change.itemId);
+            _checkUser(userId);
             if (item == null) {
               await _store.dropChange(change);
               continue;
             }
             final saved = await remote.save(item, changedAt: change.changedAt);
+            _checkUser(userId);
             await _store.completeChange(change, serverItem: saved);
         }
       } on ApiException catch (e) {
         if (_isTemporary(e)) throw _TryLater(offline: e.statusCode == null);
+        _checkUser(userId);
         // Refused for good: the item was removed (removal wins over a
         // change), or the user may no longer change it. The pull then shows
         // the backend's copy, or removes the item here too.
@@ -178,9 +211,11 @@ class SyncController extends Notifier<SyncStatus> {
     }
   }
 
-  Future<void> _pull(ItemsRemote remote) async {
+  Future<void> _pull(ItemsRemote remote, String userId) async {
     try {
-      await _store.applyServerItems(await remote.fetchAll());
+      final items = await remote.fetchAll();
+      _checkUser(userId);
+      await _store.applyServerItems(items);
     } on ApiException catch (e) {
       if (_isTemporary(e)) throw _TryLater(offline: e.statusCode == null);
       debugPrint('Could not fetch the food: $e');
@@ -188,9 +223,10 @@ class SyncController extends Notifier<SyncStatus> {
   }
 
   /// Worth trying again later: no connection, the session needs signing in
-  /// again, or the backend is busy or broken.
+  /// again, the fridge is gone (the next try opens another), or the backend is
+  /// busy or broken.
   static bool _isTemporary(ApiException e) => switch (e.statusCode) {
-    null || 401 || 408 || 429 => true,
+    null || 401 || 404 || 408 || 429 => true,
     final status => status >= 500,
   };
 
@@ -204,6 +240,11 @@ class _TryLater implements Exception {
   const _TryLater({required this.offline});
 
   final bool offline;
+}
+
+/// Another user signed in, or this one out, during their sync.
+class _UserChanged implements Exception {
+  const _UserChanged();
 }
 
 final syncControllerProvider = NotifierProvider<SyncController, SyncStatus>(

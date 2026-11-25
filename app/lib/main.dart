@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:app/core/api/api_config.dart';
 import 'package:app/core/router/app_router.dart';
+import 'package:app/core/sync/sync_controller.dart';
 import 'package:app/core/theme/app_theme.dart';
 import 'package:app/features/food/data/food_items_controller.dart';
 import 'package:app/features/food/data/product_catalog_api.dart';
@@ -23,6 +24,8 @@ class FridgeFriendApp extends ConsumerWidget {
     // Reads the food on the phone during the startup check, so My food
     // rarely has to show the loading screen again.
     ref.listen(foodItemsProvider, (_, _) {});
+    // Sends changes when the connection comes back, whichever tab is open.
+    ref.listen(syncControllerProvider, (_, _) {});
     return MaterialApp.router(
       title: 'FridgeFriend',
       theme: AppTheme.light,

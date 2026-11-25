@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:app/core/utils/ids.dart';
 import 'package:app/features/food/domain/food_item.dart';
 
 /// What the fridge holds the first time the app runs: see
 /// `FoodStore.seedOnce`. It is never sent to the backend.
 ///
-/// Sample data until the backend has an items endpoint. Dates are relative to
-/// today, so the dashboard always shows a mix of soon, upcoming and later.
+/// Sample data, for trying the app as a guest: signing in replaces what the
+/// guest didn't change with the account's food. Dates are relative to today, so
+/// the dashboard always shows a mix of soon, upcoming and later.
 final initialFoodProvider = Provider<List<FoodItem>>(
   (ref) => sampleFood(DateTime.now()),
 );
@@ -18,7 +20,7 @@ List<FoodItem> sampleFood(DateTime today) {
   // Product categories and types are the backend's seeded names.
   return [
     FoodItem(
-      id: 'chicken',
+      id: newId(),
       name: 'Chicken breasts',
       amount: '500 g',
       category: FoodCategory.meat,
@@ -28,7 +30,7 @@ List<FoodItem> sampleFood(DateTime today) {
       bestBefore: day(1),
     ),
     FoodItem(
-      id: 'milk',
+      id: newId(),
       name: 'Whole milk',
       amount: '1 litre',
       category: FoodCategory.dairy,
@@ -40,7 +42,7 @@ List<FoodItem> sampleFood(DateTime today) {
       openedExpiresOn: day(1),
     ),
     FoodItem(
-      id: 'yoghurt',
+      id: newId(),
       name: 'Greek yoghurt',
       amount: '450 g',
       category: FoodCategory.dairy,
@@ -52,7 +54,7 @@ List<FoodItem> sampleFood(DateTime today) {
       openedExpiresOn: day(2),
     ),
     FoodItem(
-      id: 'strawberries',
+      id: newId(),
       name: 'Strawberries',
       amount: '250 g',
       category: FoodCategory.veg,
@@ -62,7 +64,7 @@ List<FoodItem> sampleFood(DateTime today) {
       bestBefore: day(3),
     ),
     FoodItem(
-      id: 'spinach',
+      id: newId(),
       name: 'Baby spinach',
       amount: '200 g',
       category: FoodCategory.veg,
@@ -72,7 +74,7 @@ List<FoodItem> sampleFood(DateTime today) {
       bestBefore: day(4),
     ),
     FoodItem(
-      id: 'eggs',
+      id: newId(),
       name: 'Free-range eggs',
       amount: '6 eggs',
       category: FoodCategory.eggs,
@@ -102,7 +104,7 @@ List<FoodItem> sampleFood(DateTime today) {
       ),
     ])
       FoodItem(
-        id: 'freezer-$name',
+        id: newId(),
         name: name,
         amount: amount,
         category: category,
@@ -160,7 +162,7 @@ List<FoodItem> sampleFood(DateTime today) {
       ('Tinned tuna', '3 tins', 'Pantry', 'Tuna (canned)', 500),
     ])
       FoodItem(
-        id: 'pantry-$name',
+        id: newId(),
         name: name,
         amount: amount,
         category: name == 'Tinned tuna'

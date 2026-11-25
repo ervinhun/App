@@ -34,8 +34,26 @@ class FakeItemsRemote implements ItemsRemote {
     }
   }
 
+  /// The status opening the fridge fails with, if any.
+  int? refuseOpen;
+
+  /// When set, a save waits for this before it's answered.
+  Completer<void>? saveGate;
+
+  /// When set, fetching waits for this before it's answered.
+  Completer<void>? fetchGate;
+
+  @override
+  Future<void> open() async {
+    if (offline) throw ApiException("Can't reach the server.");
+    if (refuseOpen case final status?) {
+      throw ApiException('Refused', statusCode: status);
+    }
+  }
+
   @override
   Future<FoodItem> save(FoodItem item, {required DateTime changedAt}) async {
+    await saveGate?.future;
     _answer('save', item.id);
     return items[item.id] = item;
   }
@@ -49,7 +67,9 @@ class FakeItemsRemote implements ItemsRemote {
   @override
   Future<List<FoodItem>> fetchAll() async {
     if (offline) throw ApiException("Can't reach the server.");
-    return [...items.values];
+    final fetched = [...items.values];
+    await fetchGate?.future;
+    return fetched;
   }
 }
 
@@ -221,6 +241,100 @@ void main() {
     remote.refuse.remove('a');
     await c.read(syncControllerProvider.notifier).syncNow();
     expect(status().pending, 0);
+  });
+
+  for (final code in [400, 403, 404, 503]) {
+    test('a $code when opening the fridge loses nothing', () async {
+      remote.refuseOpen = code;
+      start();
+      await settle();
+
+      foodNotifier().add(food('a'));
+      await settle();
+
+      expect(names(), {'Milk'});
+      expect(status().pending, 1);
+      expect(status().rejected, 0);
+
+      remote.refuseOpen = null;
+      await c.read(syncControllerProvider.notifier).syncNow();
+      expect(remote.calls, ['save a']);
+      expect(status().pending, 0);
+    });
+  }
+
+  test('food whose fridge is gone waits for the next one', () async {
+    start();
+    await settle();
+    remote.refuse['a'] = 404;
+
+    foodNotifier().add(food('a'));
+    await settle();
+
+    expect(names(), {'Milk'});
+    expect(status().pending, 1);
+  });
+
+  test('a change during its own upload is sent too', () async {
+    start();
+    await settle();
+    remote.saveGate = Completer();
+    foodNotifier().add(food('a'));
+    await settle();
+    foodNotifier().markOpened('a', DateTime(2026, 11, 15));
+    await settle();
+
+    remote.saveGate!.complete();
+    await settle();
+
+    expect(remote.items['a']!.isOpened, isTrue);
+    expect(c.read(foodItemsProvider).requireValue.single.isOpened, isTrue);
+    expect(status().pending, 0);
+  });
+
+  group('signing in as someone else during a sync', () {
+    const ben = UserDto(
+      id: '00000000-0000-0000-0000-000000000002',
+      email: 'ben@example.com',
+      displayName: 'Ben',
+      locale: 'en',
+    );
+    void signInBen() =>
+        (c.read(authControllerProvider.notifier) as _FakeAuth).signIn(ben);
+
+    test("doesn't show them food that was being fetched", () async {
+      remote.items['x'] = food('x', name: "Anna's");
+      remote.fetchGate = Completer();
+      start();
+      await settle();
+
+      signInBen();
+      await settle();
+      remote.items.clear();
+      remote.fetchGate!.complete();
+      await settle();
+
+      expect(names(), isEmpty);
+    });
+
+    test("doesn't show them food that was being sent", () async {
+      start();
+      await settle();
+      remote.saveGate = Completer();
+      foodNotifier().add(food('a', name: "Anna's"));
+      await settle();
+
+      signInBen();
+      await settle();
+      remote.saveGate!.complete();
+      remote.items.clear();
+      await settle();
+      remote.items.clear();
+      await c.read(syncControllerProvider.notifier).syncNow();
+      await settle();
+
+      expect(names(), isEmpty);
+    });
   });
 
   test('restoring a removed item brings it back under a new id', () async {

@@ -79,23 +79,40 @@ class FoodStore {
         }
       });
 
-  Future<void> _queue(String itemId, ChangeKind kind, DateTime changedAt) => _db
-      .into(_db.pendingChanges)
-      .insert(
-        PendingChangesCompanion.insert(
-          itemId: itemId,
-          kind: kind,
-          changedAt: changedAt,
-        ),
-        // Keeps its place in the queue, with the latest state.
-        onConflict: DoUpdate(
-          (_) => PendingChangesCompanion(
-            kind: Value(kind),
-            changedAt: Value(changedAt),
+  Future<void> _queue(
+    String itemId,
+    ChangeKind kind,
+    DateTime changedAt,
+  ) async {
+    final queued = await (_db.select(
+      _db.pendingChanges,
+    )..where((t) => t.itemId.equals(itemId))).getSingleOrNull();
+    // Saved to the second. Later than the queued change, which may be on its
+    // way, so that its answer isn't taken for this one's.
+    final at =
+        queued == null || _seconds(changedAt) > _seconds(queued.changedAt)
+        ? changedAt
+        : queued.changedAt.add(const Duration(seconds: 1));
+    await _db
+        .into(_db.pendingChanges)
+        .insert(
+          PendingChangesCompanion.insert(
+            itemId: itemId,
+            kind: kind,
+            changedAt: at,
           ),
-          target: [_db.pendingChanges.itemId],
-        ),
-      );
+          // Keeps its place in the queue, with the latest state.
+          onConflict: DoUpdate(
+            (_) => PendingChangesCompanion(
+              kind: Value(kind),
+              changedAt: Value(at),
+            ),
+            target: [_db.pendingChanges.itemId],
+          ),
+        );
+  }
+
+  static int _seconds(DateTime time) => time.millisecondsSinceEpoch ~/ 1000;
 
   /// The oldest change still to send.
   Future<PendingChange?> nextChange() =>
