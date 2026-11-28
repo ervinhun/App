@@ -1,0 +1,10 @@
+# Weekly PR that bumps the SHA-pinned GitHub Actions (and their "# vX" comments).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development   # otherwise Dependabot targets the default branch, main
+    schedule: { interval: weekly }
+    groups:
+      actions:                   # one PR for all actions instead of one per action
+        patterns: ["*"]
