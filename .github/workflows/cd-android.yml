@@ -23,7 +23,7 @@ name: CD - Build & Distribute Android
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ['Release Gates']
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -36,14 +36,35 @@ defaults:
     working-directory: app
 
 jobs:
+  # Release Gates still runs when CI failed, with every job skipped, and a workflow with only skipped jobs
+  # reports "success". So check that the gate actually ran and passed.
+  gates:
+    name: Confirm the release gates passed
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    steps:
+      - name: Check verify-release-build succeeded
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          result=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" --paginate \
+            --jq '.jobs[] | select(.name == "verify-release-build") | .conclusion')
+          echo "verify-release-build: ${result:-not found}"
+          [ "$result" = "success" ]
+
   build-android:
     name: Build Android
-    # A fork PR can name its branch 'main' too, so also require a push in this repo (workflow_run runs with write access)
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+    needs: gates
+    # A manual run skips the gate; an automatic one only builds once it passed
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.gates.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -107,17 +128,34 @@ jobs:
       - name: Check build configuration
         env:
           GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
           if [ -z "$GOOGLE_SERVER_CLIENT_ID" ]; then
             echo "::error::Set the GOOGLE_SERVER_CLIENT_ID repository variable."
             exit 1
           fi
+          # Without it the app is built for the emulator's local backend (http://10.0.2.2:5092)
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::Set the API_BASE_URL repository variable to the production API (https://...)."; exit 1 ;;
+          esac
 
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: flutter build apk --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }} --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
 
       - name: Build appBundle
-        run: flutter build appbundle --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: flutter build appbundle --release --build-number=${{ steps.version.outputs.BUILD_NUMBER }} --dart-define=GOOGLE_SERVER_CLIENT_ID=${{ vars.GOOGLE_SERVER_CLIENT_ID }} --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+
+      # Once the KEYSTORE_* secrets exist, a release signed with the debug key means Gradle ignored key.properties
+      # (android/app/build.gradle.kts still signs release builds with the debug key: wire key.properties up first)
+      - name: Check the APK is not signed with the debug key
+        if: steps.signing.outputs.configured == 'true'
+        run: |
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          if "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | grep -q 'CN=Android Debug'; then
+            echo "::error::The release APK is signed with the debug key although KEYSTORE_BASE64 is set."
+            exit 1
+          fi
 
       - name: Collect artifacts
         run: |

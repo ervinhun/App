@@ -1,0 +1,112 @@
+name: Release Gates
+
+# Runs after a successful CI run of a push to main (not for pull requests). An app is not a server: once a build is
+# on a phone it cannot be rolled back, and it only works if the API it was built for is really there. So the gate
+# checks FACTS about the release build and about the API it will talk to:
+#
+#   verify-release-build
+#     api contract   the app's generated API client, regenerated from Backend main's OpenAPI document (main is
+#                    what is deployed to production), is identical to the committed one: every call the app makes
+#                    exists in production with the same shape
+#     live api       Backend's own facts script (scripts/e2e-facts.sh, read-only) holds against API_BASE_URL
+#     release apk    built exactly like cd-android.yml builds it, then scripts/apk-facts.sh checks the merged
+#                    manifest (not debuggable, no backup, no cleartext) and that API_BASE_URL is compiled in
+#
+# cd.yml and cd-android.yml only release once this job passed.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: release-gates-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  # cd.yml and cd-android.yml check this job by name
+  verify-release-build:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Check build configuration
+        run: |
+          [ -n "$GOOGLE_SERVER_CLIENT_ID" ] || { echo "::error::Set the GOOGLE_SERVER_CLIENT_ID repository variable."; exit 1; }
+          case "$API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::Set the API_BASE_URL repository variable to the production API (https://...)."; exit 1 ;;
+          esac
+
+      # swagger_parser.yaml reads ../../Backend/openapi/FridgeFriend.json, i.e. a Backend checkout next to this repo
+      - name: Checkout Backend main (what production runs)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ervinhun/Backend
+          ref: main
+          path: backend-main
+          persist-credentials: false
+      - name: Put Backend where swagger_parser.yaml expects it
+        run: ln -s "$GITHUB_WORKSPACE/backend-main" "$GITHUB_WORKSPACE/../Backend"
+
+      - name: Check the facts of the live API
+        run: WAIT=180 bash "$GITHUB_WORKSPACE/backend-main/scripts/e2e-facts.sh" "$API_BASE_URL"
+
+      - name: Set Up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set Up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # The same commands as the comment in swagger_parser.yaml
+      - name: The API client matches the API in production
+        run: |
+          dart run swagger_parser
+          dart run build_runner build -d
+          dart format lib/core/api/generated
+          if [ -n "$(git status --porcelain lib/core/api/generated)" ]; then
+            git --no-pager diff --stat lib/core/api/generated
+            echo "::error::The app's API client differs from Backend main's OpenAPI document: release the Backend first, or regenerate the client."
+            exit 1
+          fi
+
+      # The same flags as cd-android.yml, so the facts are about what ships
+      - name: Build the release APK
+        run: >
+          flutter build apk --release
+          --dart-define=API_BASE_URL="$API_BASE_URL"
+          --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+
+      - name: Check the facts of the release APK
+        run: bash ../scripts/apk-facts.sh build/app/outputs/flutter-apk/app-release.apk "$API_BASE_URL"
