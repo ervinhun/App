@@ -76,11 +76,18 @@ and commit the result. Wrap calls in `apiCall(...)` (`core/api/api_client.dart`)
 
 ## CI/CD
 
-- **`ci.yml`** — format check, analyze, test (test running is currently disabled via `RUN_TESTS`, kept wired in for when the team starts writing them).
-- **`cd.yml`** — on every push to `main` that passes CI: computes the next semver tag from commit messages and creates a GitHub release. The real Android build job in here is a placeholder until the pieces below exist.
-- **`cd-android.yml`** — builds a release APK/AAB on every push to `main` that passes CI. Runs right now with debug signing and no distribution (uploads as a build artifact); becomes a real signed build distributed to Firebase App Distribution testers once these repo secrets are added:
+`CI` → `Release Gates` → `cd.yml` + `cd-android.yml`, each started when the one before it finishes (`workflow_run`). `workflow_run` workflows run from the copy on `main`, so changes to them take effect once they reach `main`.
+
+- **`ci.yml`** — format check, analyze, test.
+- **`release-gates.yml`** — on every push to `main` that passes CI. A build on a phone can't be rolled back, so before anything is released it checks:
+  - **API contract**: the API client regenerated from Backend `main`'s OpenAPI document (what production runs) is identical to the committed one. If the app needs an endpoint production doesn't have yet, release the Backend first.
+  - **Live API**: Backend's own read-only facts script (`scripts/e2e-facts.sh`) holds against `API_BASE_URL`.
+  - **Release APK**: built with the same flags as `cd-android.yml`, then [`scripts/apk-facts.sh`](scripts/apk-facts.sh) checks the merged manifest (not debuggable, no backup, no cleartext) and that `API_BASE_URL` is compiled in. Run it locally on any APK: `ANDROID_HOME=~/Library/Android/sdk bash scripts/apk-facts.sh <apk> <api-base-url>`.
+- **`cd.yml`** — once the gate passed: computes the next semver tag from commit messages and creates a GitHub release. The real Android build job in here is a placeholder until the pieces below exist.
+- **`cd-android.yml`** — once the gate passed (or run by hand): builds a release APK/AAB for `API_BASE_URL`. Once the `KEYSTORE_*` secrets exist it fails if the APK is still signed with the debug key. Runs right now with debug signing and no distribution (uploads as a build artifact); becomes a real signed build distributed to Firebase App Distribution testers once these repo secrets are added:
   - `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD`, `KEY_ALIAS` — also requires wiring `android/app/build.gradle.kts`'s release `signingConfig` to read `android/key.properties` (still TODO, signs with the debug key today).
   - `FIREBASE_APP_ID`, `FIREBASE_SERVICE_CREDENTIALS` — Firebase App Distribution.
+- Repository **variables** both the gate and `cd-android.yml` need: `API_BASE_URL` (the production API, `https://fridgefriend-api.fly.dev`) and `GOOGLE_SERVER_CLIENT_ID`.
 - **`cd-ios.yml.disabled`** — same idea for iOS; stays disabled until the Apple developer account and `CERTIFICATE_PASSWORD`/`DISTRIBUTION_CERT_BASE64`/`PROVISIONING_PROFILE_BASE64` secrets exist, then rename it to `cd-ios.yml`.
 
 ## Tech stack

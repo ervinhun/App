@@ -7,21 +7,43 @@ name: CD
 # (append "(MAJOR)" or "(MINOR)" to a commit message to bump those; anything
 # else bumps patch).
 #
-# Triggered off CI actually completing (workflow_run), not a second
-# independent `push:` trigger, so a release is never tagged from a commit
-# whose build/test hasn't actually finished and passed.
+# Triggered off Release Gates completing (CI -> Release Gates -> CD), so a
+# release is never tagged from a commit whose release build, API contract
+# and live API checks haven't passed (see release-gates.yml).
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ['Release Gates']
     types: [completed]
+    branches: [main]
 
 jobs:
+  # Release Gates still runs when CI failed, with every job skipped, and a workflow with only skipped jobs
+  # reports "success". So check that the gate actually ran and passed.
+  gates:
+    name: Confirm the release gates passed
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    steps:
+      - name: Check verify-release-build succeeded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          result=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" --paginate \
+            --jq '.jobs[] | select(.name == "verify-release-build") | .conclusion')
+          echo "verify-release-build: ${result:-not found}"
+          [ "$result" = "success" ]
+
   version:
     name: Compute next version & tag
-    if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+    needs: gates
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -36,7 +58,7 @@ jobs:
 
       - name: Compute next semantic version
         id: semver
-        uses: paulhatch/semantic-version@v5.4.0
+        uses: paulhatch/semantic-version@a8f8f59fd7f0625188492e945240f12d7ad2dca3 # v5.4.0
         with:
           tag_prefix: 'v'
           major_pattern: '(MAJOR)'
@@ -49,7 +71,7 @@ jobs:
           git push origin "${{ steps.semver.outputs.version_tag }}"
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ steps.semver.outputs.version_tag }}
           generate_release_notes: true
