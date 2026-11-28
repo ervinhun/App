@@ -7,12 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 class _Hub implements HttpClientAdapter {
   RequestOptions? last;
   @override
-  Future<ResponseBody> fetch(RequestOptions o, Stream<Uint8List>? s, Future<void>? c) async {
+  Future<ResponseBody> fetch(
+    RequestOptions o,
+    Stream<Uint8List>? s,
+    Future<void>? c,
+  ) async {
     last = o;
     return ResponseBody.fromString(
       '[{"id":"e","features":[{"key":"createContainer","value":true},{"key":"off","value":false}]}]',
       200,
-      headers: {Headers.contentTypeHeader: ['application/json']},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
     );
   }
 
@@ -25,11 +31,22 @@ void main() {
   late FeatureFlags flags;
   setUp(() {
     hub = _Hub();
-    flags = FeatureFlags(Dio()..httpClientAdapter = hub, url: 'http://hub', apiKey: 'k');
+    flags = FeatureFlags(
+      Dio()..httpClientAdapter = hub,
+      url: 'http://hub',
+      apiKey: 'k',
+    );
   });
 
   test('reads the flag and sends the context header', () async {
-    expect(await flags.isEnabled('createContainer', userKey: 'u 1', country: 'hungary'), isTrue);
+    expect(
+      await flags.isEnabled(
+        'createContainer',
+        userKey: 'u 1',
+        country: 'hungary',
+      ),
+      isTrue,
+    );
     expect(hub.last!.uri.toString(), 'http://hub/features?apiKey=k');
     expect(hub.last!.headers['x-featurehub'], 'userkey=u%201,country=hungary');
     expect(await flags.isEnabled('off'), isFalse);
